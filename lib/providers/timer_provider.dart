@@ -13,10 +13,26 @@ import '../utils/constants.dart';
 
 enum TimerState { idle, delaying, running, paused, completed }
 
+enum _CompletionSource { timer, restored, nativeAlarm }
+
 class TimerProvider extends ChangeNotifier {
-  final AudioService _audioService = AudioService();
-  final VibrationService _vibrationService = VibrationService();
-  final AlarmService _alarmService = AlarmService();
+  TimerProvider({
+    AudioService? audioService,
+    VibrationService? vibrationService,
+    AlarmService? alarmService,
+    DateTime Function()? now,
+    Future<void> Function(MeditationSession)? saveSession,
+  }) : _audioService = audioService ?? AudioService(),
+       _vibrationService = vibrationService ?? VibrationService(),
+       _alarmService = alarmService ?? AlarmService(),
+       _now = now ?? DateTime.now,
+       _saveSession = saveSession ?? DatabaseService.insertSession;
+
+  final AudioService _audioService;
+  final VibrationService _vibrationService;
+  final AlarmService _alarmService;
+  final DateTime Function() _now;
+  final Future<void> Function(MeditationSession) _saveSession;
 
   TimerMode _timerMode = TimerMode.timed;
   int _durationMinutes = AppConstants.defaultTimerDurationMinutes;
@@ -156,12 +172,13 @@ class TimerProvider extends ChangeNotifier {
   }
 
   Future<void> startSession() async {
+    final requestedAt = _now();
     _currentSessionId = const Uuid().v4();
     // Captured once, here, not read again at save time: if the user
     // switches profile mid-session, this session must stay attributed to
     // whoever started it, not whoever is active when it finishes.
     _currentProfileId = await PersistenceService.loadActiveProfileId();
-    _startTime = DateTime.now();
+    _startTime = _now();
     _elapsedSeconds = 0;
     _pauseDurationSeconds = 0;
     _lastIntervalMinute = -1;
@@ -170,32 +187,26 @@ class TimerProvider extends ChangeNotifier {
     _sessionFinalized = false;
     _lastSessionCompletedNaturally = true;
 
-    switch (_timerMode) {
-      case TimerMode.timed:
-        _totalDurationSeconds = _durationMinutes * 60;
-        _remainingSeconds = _totalDurationSeconds;
-        _endTime = _startTime.add(Duration(seconds: _totalDurationSeconds));
-        break;
-      case TimerMode.endAt:
-        final now = DateTime.now();
+    // End At names a clock time chosen when Start was pressed. Preparation
+    // must not move that target to tomorrow if the clock passes it meanwhile.
+    _endTime = null;
+    if (_timerMode == TimerMode.endAt) {
+      _endTime = DateTime(
+        requestedAt.year,
+        requestedAt.month,
+        requestedAt.day,
+        _endAtHour,
+        _endAtMinute,
+      );
+      if (!_endTime!.isAfter(requestedAt)) {
         _endTime = DateTime(
-          now.year,
-          now.month,
-          now.day,
+          requestedAt.year,
+          requestedAt.month,
+          requestedAt.day + 1,
           _endAtHour,
           _endAtMinute,
         );
-        if (_endTime!.isBefore(now)) {
-          _endTime = _endTime!.add(const Duration(days: 1));
-        }
-        _totalDurationSeconds = _endTime!.difference(now).inSeconds;
-        _remainingSeconds = _totalDurationSeconds;
-        break;
-      case TimerMode.unlimited:
-        _totalDurationSeconds = 0;
-        _remainingSeconds = -1;
-        _endTime = null;
-        break;
+      }
     }
 
     // If a session delay is configured, enter the delaying state first.
@@ -212,6 +223,36 @@ class TimerProvider extends ChangeNotifier {
 
   /// Called after the delay countdown completes, or immediately if no delay.
   Future<void> _beginRunning() async {
+    // Preparation time is not meditation time. Timed sessions get their full
+    // duration from here; End At retains the clock target selected at Start.
+    _startTime = _now();
+    switch (_timerMode) {
+      case TimerMode.timed:
+        _totalDurationSeconds = _durationMinutes * 60;
+        _remainingSeconds = _totalDurationSeconds;
+        _endTime = _startTime.add(Duration(seconds: _totalDurationSeconds));
+        break;
+      case TimerMode.endAt:
+        if (!_startTime.isBefore(_endTime!)) {
+          // The target arrived during preparation: there was no meditation
+          // time. Finish at that target without playing a start cue or
+          // scheduling an alarm in the past.
+          _startTime = _endTime!;
+          _totalDurationSeconds = 0;
+          _remainingSeconds = 0;
+          await _onSessionComplete();
+          return;
+        }
+        _totalDurationSeconds = _endTime!.difference(_startTime).inSeconds;
+        _remainingSeconds = _remainingAt(_startTime);
+        break;
+      case TimerMode.unlimited:
+        _totalDurationSeconds = 0;
+        _remainingSeconds = -1;
+        _endTime = null;
+        break;
+    }
+
     _state = TimerState.running;
 
     await _audioService.setVolume(volume / 100.0);
@@ -230,7 +271,7 @@ class TimerProvider extends ChangeNotifier {
     } else if (_timerMode == TimerMode.unlimited) {
       // Schedule a dummy keep-alive alarm far in the future so the alarm
       // package's iOS background audio keep-alive mechanism stays active.
-      final dummyEndTime = DateTime.now().add(const Duration(hours: 72));
+      final dummyEndTime = _now().add(const Duration(hours: 72));
       await _alarmService.scheduleEndAlarm(
         id: 1003,
         dateTime: dummyEndTime,
@@ -249,9 +290,14 @@ class TimerProvider extends ChangeNotifier {
     _delayTimer?.cancel();
     _delayTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _delayRemainingSeconds--;
-      if (_delayRemainingSeconds <= 0) {
+      final endAtReached =
+          _timerMode == TimerMode.endAt &&
+          _endTime != null &&
+          !_now().isBefore(_endTime!);
+      if (_delayRemainingSeconds <= 0 || endAtReached) {
         _delayTimer?.cancel();
         _delayTimer = null;
+        _delayRemainingSeconds = 0;
         _beginRunning();
       } else {
         notifyListeners();
@@ -272,7 +318,9 @@ class TimerProvider extends ChangeNotifier {
   Future<void> pauseSession() async {
     if (_state != TimerState.running) return;
     _state = TimerState.paused;
-    _pauseStartTime = DateTime.now();
+    _pauseStartTime = _now();
+    _elapsedSeconds = _calculateElapsedSeconds(_pauseStartTime);
+    _remainingSeconds = _remainingAt(_pauseStartTime);
     _stopTick();
     if (_timerMode == TimerMode.unlimited) {
       await _alarmService.cancelAlarm(1003);
@@ -286,7 +334,7 @@ class TimerProvider extends ChangeNotifier {
 
   Future<void> resumeSession() async {
     if (_state != TimerState.paused) return;
-    final pauseDuration = DateTime.now().difference(_pauseStartTime);
+    final pauseDuration = _now().difference(_pauseStartTime);
     _pauseDurationSeconds += pauseDuration.inSeconds;
 
     if (_endTime != null) {
@@ -307,7 +355,7 @@ class TimerProvider extends ChangeNotifier {
       );
     } else if (_timerMode == TimerMode.unlimited) {
       // Re-schedule keep-alive dummy alarm on resume
-      final dummyEndTime = DateTime.now().add(const Duration(hours: 72));
+      final dummyEndTime = _now().add(const Duration(hours: 72));
       await _alarmService.scheduleEndAlarm(
         id: 1003,
         dateTime: dummyEndTime,
@@ -332,11 +380,11 @@ class TimerProvider extends ChangeNotifier {
 
     _stopTick();
 
-    await _alarmService.cancelAllAlarms();
-
-    final now = DateTime.now();
+    final now = _now();
     _elapsedSeconds = _calculateElapsedSeconds(now);
     _state = TimerState.completed;
+
+    await _alarmService.cancelAllAlarms();
 
     // When user stops early (completed: false), skip end sound/vibration
     // so they can leave quietly (e.g., in a group meditation).
@@ -355,7 +403,7 @@ class TimerProvider extends ChangeNotifier {
       timerMode: _timerMode.asString,
       completed: completed,
     );
-    await DatabaseService.insertSession(session);
+    await _saveSession(session);
 
     await PersistenceService.clearActiveSession();
 
@@ -391,9 +439,9 @@ class TimerProvider extends ChangeNotifier {
     final pauseStartTimeMs = sessionData['pauseStartTime'] ?? 0;
 
     _startTime = DateTime.fromMillisecondsSinceEpoch(startTimeMs);
-    _endTime = DateTime.fromMillisecondsSinceEpoch(
-      endTimeMs > 0 ? endTimeMs : 0,
-    );
+    _endTime = endTimeMs > 0
+        ? DateTime.fromMillisecondsSinceEpoch(endTimeMs)
+        : null;
     _totalDurationSeconds = durationSeconds;
     _pauseDurationSeconds = pauseDuration;
     _currentSessionId = const Uuid().v4();
@@ -404,6 +452,11 @@ class TimerProvider extends ChangeNotifier {
 
     final modeStr = await PersistenceService.loadActiveSessionMode();
     _timerMode = TimerMode.fromString(modeStr ?? 'timed');
+    if (_timerMode == TimerMode.timed) {
+      _durationMinutes = durationSeconds ~/ 60;
+    } else if (_timerMode == TimerMode.unlimited) {
+      _endTime = null;
+    }
 
     final isPaused = await PersistenceService.loadActiveSessionIsPaused();
     _state = isPaused ? TimerState.paused : TimerState.running;
@@ -412,23 +465,23 @@ class TimerProvider extends ChangeNotifier {
       if (pauseStartTimeMs > 0) {
         _pauseStartTime = DateTime.fromMillisecondsSinceEpoch(pauseStartTimeMs);
       } else {
-        _pauseStartTime = DateTime.now();
+        _pauseStartTime = _now();
       }
     }
 
-    final now = DateTime.now();
+    final now = _now();
     _elapsedSeconds = _calculateElapsedSeconds(now);
-
-    if (_timerMode == TimerMode.timed && _endTime != null) {
-      _remainingSeconds = _endTime!.difference(now).inSeconds;
-    }
+    // A paused countdown stays frozen while the app is closed. End At uses
+    // the same remaining-time display and existing pause extension policy.
+    _remainingSeconds = _remainingAt(isPaused ? _pauseStartTime : now);
 
     _lastIntervalMinute = -1;
+    _lastVibrationIntervalMinute = -1;
 
     if (!isPaused) {
-      if (_endTime != null && _endTime!.millisecondsSinceEpoch > 0) {
-        if (_endTime!.isBefore(DateTime.now())) {
-          await _onSessionComplete(silent: true);
+      if (_endTime != null) {
+        if (!_endTime!.isAfter(now)) {
+          await _onSessionComplete(source: _CompletionSource.restored);
           return;
         }
 
@@ -442,7 +495,7 @@ class TimerProvider extends ChangeNotifier {
         );
       } else if (_timerMode == TimerMode.unlimited) {
         // Re-schedule keep-alive dummy alarm when restoring a running session
-        final dummyEndTime = DateTime.now().add(const Duration(hours: 72));
+        final dummyEndTime = _now().add(const Duration(hours: 72));
         await _alarmService.scheduleEndAlarm(
           id: 1003,
           dateTime: dummyEndTime,
@@ -486,30 +539,20 @@ class TimerProvider extends ChangeNotifier {
   }
 
   void _onTick() {
-    if (_alarmFired) return;
+    if (_alarmFired || _state != TimerState.running) return;
 
-    final now = DateTime.now();
+    final now = _now();
+    final previousElapsed = _elapsedSeconds;
+    final previousRemaining = _remainingSeconds;
     _elapsedSeconds = _calculateElapsedSeconds(now);
+    _remainingSeconds = _remainingAt(now);
 
     switch (_timerMode) {
       case TimerMode.timed:
-        if (_endTime != null) {
-          final remaining = _endTime!.difference(now).inSeconds;
-          _remainingSeconds = remaining < 0 ? 0 : remaining;
-          if (_remainingSeconds <= 0) {
-            _onSessionComplete(silent: false);
-            return;
-          }
-        }
-        break;
       case TimerMode.endAt:
-        if (_endTime != null) {
-          final remaining = _endTime!.difference(now).inSeconds;
-          _remainingSeconds = remaining < 0 ? 0 : remaining;
-          if (_remainingSeconds <= 0) {
-            _onSessionComplete(silent: false);
-            return;
-          }
+        if (_endTime != null && !now.isBefore(_endTime!)) {
+          _onSessionComplete();
+          return;
         }
         break;
       case TimerMode.unlimited:
@@ -518,7 +561,23 @@ class TimerProvider extends ChangeNotifier {
     }
 
     _checkIntervalSounds(now);
-    notifyListeners();
+    // The tick runs twice a second so the deadline and interval bells land on
+    // time, but everything on screen is whole seconds. Notifying on a tick
+    // that changed nothing rebuilt the timer screens for no visible change.
+    if (_elapsedSeconds != previousElapsed ||
+        _remainingSeconds != previousRemaining) {
+      notifyListeners();
+    }
+  }
+
+  int _remainingAt(DateTime now) {
+    if (_timerMode == TimerMode.unlimited) return -1;
+    final remaining = _endTime?.difference(now).inMicroseconds ?? 0;
+    if (remaining <= 0) return 0;
+    // Display the last second until the actual deadline, rather than
+    // rounding it down to zero and finishing up to one second early.
+    return (remaining + Duration.microsecondsPerSecond - 1) ~/
+        Duration.microsecondsPerSecond;
   }
 
   /// Convert a bare sound name (e.g. "ThreeBowl") to the asset path
@@ -566,7 +625,9 @@ class TimerProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _onSessionComplete({bool silent = false}) async {
+  Future<void> _onSessionComplete({
+    _CompletionSource source = _CompletionSource.timer,
+  }) async {
     if (_alarmFired || _sessionFinalized) return;
     _alarmFired = true;
     _sessionFinalized = true;
@@ -579,26 +640,32 @@ class TimerProvider extends ChangeNotifier {
 
     _state = TimerState.completed;
 
-    final now = DateTime.now();
+    final completedAt = _endTime ?? _now();
     _elapsedSeconds = _totalDurationSeconds;
+    _remainingSeconds = 0;
 
-    if (!silent) {
+    // A native callback arrives when the bell starts, so canceling its alarm
+    // here would cut the one-shot bell short. Expired restores still clear
+    // stale alarms, while foreground completion replaces them with its cue.
+    if (source != _CompletionSource.nativeAlarm) {
+      await _alarmService.cancelAllAlarms();
+    }
+    if (source == _CompletionSource.timer) {
       await _audioService.playSound(endSound);
       await _vibrationService.vibrate(endVibration);
-      await _alarmService.cancelAllAlarms();
     }
 
     final session = MeditationSession(
       id: _currentSessionId ?? const Uuid().v4(),
       profileId: _currentProfileId,
       startTime: _startTime,
-      endTime: now,
+      endTime: completedAt,
       durationSeconds: _elapsedSeconds,
       targetDurationSeconds: _totalDurationSeconds,
       timerMode: _timerMode.asString,
       completed: true,
     );
-    await DatabaseService.insertSession(session);
+    await _saveSession(session);
 
     await PersistenceService.clearActiveSession();
 
@@ -633,6 +700,9 @@ class TimerProvider extends ChangeNotifier {
   }
 
   Future<void> stopSounds() async {
+    // Completion keeps the native cue playing until the user leaves.
+    // AudioService only owns Flutter playback, not the native alarm player.
+    await _alarmService.cancelAllAlarms();
     await _audioService.stop();
     await _vibrationService.cancel();
   }
@@ -642,8 +712,16 @@ class TimerProvider extends ChangeNotifier {
   void onNativeAlarmFired(int requestCode) {
     debugPrint('TimerProvider: Native alarm fired with code $requestCode');
 
-    if (_state == TimerState.running) {
-      _onSessionComplete(silent: true);
+    final expectedCode = switch (_timerMode) {
+      TimerMode.timed => 1001,
+      TimerMode.endAt => 1002,
+      TimerMode.unlimited => null,
+    };
+    if (_state == TimerState.running &&
+        requestCode == expectedCode &&
+        _endTime != null &&
+        !_now().isBefore(_endTime!)) {
+      _onSessionComplete(source: _CompletionSource.nativeAlarm);
     }
   }
 

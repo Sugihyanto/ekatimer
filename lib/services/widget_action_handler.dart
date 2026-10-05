@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../models/timer_mode.dart';
 import '../providers/timer_provider.dart';
+import 'persistence_service.dart';
 
 /// Handles widget tap actions from home screen widgets.
 ///
@@ -108,6 +109,24 @@ class WidgetActionHandler {
     return Platform.isAndroid ? _handleAndroid(context) : _handleIos(context);
   }
 
+  // A launcher shortcut must not silently discard an in-progress session.
+  // This also covers a cold launch after Android reclaimed the app process.
+  static Future<bool> _preserveExistingSession(TimerProvider timer) async {
+    if (timer.state == TimerState.running ||
+        timer.state == TimerState.paused ||
+        timer.state == TimerState.delaying) {
+      return true;
+    }
+    if (timer.state == TimerState.idle) {
+      final saved = await PersistenceService.loadActiveSession();
+      if (saved != null) {
+        await timer.restoreSession(saved);
+        return true;
+      }
+    }
+    return false;
+  }
+
   static Future<bool> _handleIos(BuildContext context) async {
     if (!context.mounted) return false;
     final timerProvider = context.read<TimerProvider>();
@@ -126,6 +145,8 @@ class WidgetActionHandler {
       if (timerMode == null) return false;
 
       final mode = TimerMode.fromString(timerMode);
+
+      if (await _preserveExistingSession(timerProvider)) return true;
 
       // Reset the timer state machine to ensure it is clean before configuration.
       timerProvider.reset();
@@ -180,6 +201,8 @@ class WidgetActionHandler {
 
       final mode = TimerMode.fromString(timerMode);
 
+      if (await _preserveExistingSession(timerProvider)) return true;
+
       // Reset the timer state machine to ensure it is clean before configuration.
       timerProvider.reset();
 
@@ -222,22 +245,13 @@ class WidgetActionHandler {
 
   /// Fetch widget action data for inspection (e.g. checking `fromAlarm`).
   ///
-  /// IMPORTANT: on iOS this calls getWidgetAction which CLEARS the native
-  /// store.  Call this only once at the top of _checkForActiveSession; do not
-  /// call it again before handleWidgetAction in the same launch path, or
-  /// handleWidgetAction will receive nil.
-  ///
-  /// If you need peek-without-clear semantics, add a separate native method
-  /// (peekWidgetAction) — for now the single call pattern is sufficient.
+  /// Peeking leaves the action available for handleWidgetAction on both platforms.
   static Future<Map<String, dynamic>?> getWidgetActionData() async {
     try {
       // Use peekWidgetAction so the data is NOT cleared — handleWidgetAction
       // can still read it via getWidgetAction in the same launch sequence.
-      final methodName = Platform.isAndroid
-          ? 'getWidgetAction'
-          : 'peekWidgetAction';
       final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-        methodName,
+        'peekWidgetAction',
       );
       if (result == null || result.isEmpty) return null;
       return result.cast<String, dynamic>();

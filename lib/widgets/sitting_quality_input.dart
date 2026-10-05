@@ -126,29 +126,33 @@ class _SittingQualityInputState extends State<SittingQualityInput> {
         const SizedBox(height: 4),
         Theme(
           data: theme.copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            key: const ValueKey('quality-notes-info'),
-            tilePadding: EdgeInsets.zero,
-            childrenPadding: const EdgeInsets.only(bottom: 8),
-            visualDensity: VisualDensity.compact,
-            leading: const Icon(Icons.info_outline_rounded, size: 20),
-            title: Text(
-              t.translate('quality.notesTitle'),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  t.translate('quality.notesBody'),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+          // Draw the expansion tile's ink above a colored parent card.
+          child: Material(
+            type: MaterialType.transparency,
+            child: ExpansionTile(
+              key: const ValueKey('quality-notes-info'),
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              visualDensity: VisualDensity.compact,
+              leading: const Icon(Icons.info_outline_rounded, size: 20),
+              title: Text(
+                t.translate('quality.notesTitle'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ],
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    t.translate('quality.notesBody'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],

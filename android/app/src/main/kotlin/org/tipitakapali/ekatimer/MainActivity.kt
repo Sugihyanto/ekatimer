@@ -57,7 +57,7 @@ class MainActivity : FlutterActivity() {
                     )
                     result.success(null)
                 }
-                "getWidgetAction" -> {
+                "getWidgetAction", "peekWidgetAction" -> {
                     val data = mutableMapOf<String, Any>()
                     if (widgetTimerMode != null) {
                         data["timerMode"] = widgetTimerMode!!
@@ -67,20 +67,22 @@ class MainActivity : FlutterActivity() {
                         data["action"] = widgetAction!!
                         data["statsPeriod"] = widgetStatsPeriod ?: "week"
                     }
-                    if (intent?.getIntExtra("from_alarm", -1) != -1) {
+                    if ((intent?.getIntExtra("from_alarm", -1) ?: -1) != -1) {
                         data["fromAlarm"] = true
                     }
 
-                    widgetTimerMode = null
-                    widgetTimerDuration = null
-                    widgetAction = null
-                    widgetStatsPeriod = null
+                    if (call.method == "getWidgetAction") {
+                        widgetTimerMode = null
+                        widgetTimerDuration = null
+                        widgetAction = null
+                        widgetStatsPeriod = null
 
-                    intent?.removeExtra("widget_timer_mode")
-                    intent?.removeExtra("widget_timer_duration")
-                    intent?.removeExtra("widget_action")
-                    intent?.removeExtra("widget_stats_period")
-                    intent?.removeExtra("from_alarm")
+                        intent?.removeExtra("widget_timer_mode")
+                        intent?.removeExtra("widget_timer_duration")
+                        intent?.removeExtra("widget_action")
+                        intent?.removeExtra("widget_stats_period")
+                        intent?.removeExtra("from_alarm")
+                    }
 
                     result.success(data.ifEmpty { null })
                 }

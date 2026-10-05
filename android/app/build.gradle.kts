@@ -29,6 +29,10 @@ android {
 
     defaultConfig {
         applicationId = "org.tipitakapali.ekatimer"
+        ndk {
+            abiFilters.clear()
+            abiFilters.add("arm64-v8a")
+        }
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

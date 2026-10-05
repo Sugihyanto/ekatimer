@@ -48,8 +48,8 @@ class ExcelDataService {
                 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           ),
         ],
-        subject: 'ekaTimer Excel Report',
-        text: 'Meditation session report from ekaTimer',
+        subject: 'Meditation Timer Excel Report',
+        text: 'Meditation session report from Meditation Timer',
       ),
     );
 

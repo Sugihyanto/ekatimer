@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Resources that only Dart reaches, by name, at runtime. notification_service
+  and alarm_service pass "ic_lotus" to flutter_local_notifications and the
+  alarm package, which look it up with getIdentifier(). The resource shrinker
+  cannot see those lookups, so without this entry a release build is free to
+  strip the icon, and flutter_local_notifications then fails with invalid_icon.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_lotus" />

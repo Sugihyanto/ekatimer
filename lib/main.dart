@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -15,17 +17,15 @@ import 'app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize services
-  await AudioService().init();
-  await VibrationService().init();
-  await NotificationService().init();
-  await AlarmService().init();
-
-  // Request notification permission on startup
-  await _requestPermissions();
-
-  // Initialize widget data service for home screen / lock screen widgets
-  await WidgetDataService.initialize();
+  // The plugins set themselves up independently, so start them together;
+  // awaiting each in turn held the first frame for the sum of all of them.
+  await Future.wait([
+    AudioService().init(),
+    VibrationService().init(),
+    NotificationService().init(),
+    AlarmService().init(),
+    WidgetDataService.initialize(),
+  ]);
 
   runApp(
     MultiProvider(
@@ -36,6 +36,13 @@ void main() async {
       ],
       child: const MeditationTimerApp(),
     ),
+  );
+
+  // Ask once the app is on screen. Before runApp, a first-launch prompt, or
+  // the exact-alarm settings page on newer Android, kept the user looking at
+  // the splash screen until they answered.
+  WidgetsBinding.instance.addPostFrameCallback(
+    (_) => unawaited(_requestPermissions()),
   );
 }
 

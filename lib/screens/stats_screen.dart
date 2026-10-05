@@ -14,7 +14,6 @@ import '../widgets/session_card.dart';
 import '../widgets/edit_session_dialog.dart';
 import '../widgets/practice_stats_table.dart';
 import '../widgets/quality_rating_label.dart';
-import '../services/database_service.dart';
 import '../utils/sitting_quality.dart';
 import '../utils/session_calendar.dart';
 
@@ -58,36 +57,34 @@ class _StatsScreenState extends State<StatsScreen>
 
     // Safely load the data after the initial widget build frame completes.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
+      if (mounted) _loadData();
     });
   }
 
   void _loadData() {
     final provider = context.read<SessionProvider>();
-    final loadFuture = provider.loadSessions();
+    final loadFuture = provider.loadSessions().then(
+      (_) => _refreshOldestDate(),
+    );
 
     setState(() {
       _weeklyDataFuture = loadFuture.then((_) => provider.getWeeklyData());
       _monthlyDataFuture = loadFuture.then((_) => provider.getMonthlyData());
       _yearlyDataFuture = loadFuture.then((_) => provider.getYearlyData());
     });
-
-    _refreshOldestDate();
   }
 
   void _refreshOldestDate() {
-    final profileId = context.read<SessionProvider>().activeProfileId;
-    DatabaseService.getOldestSessionTimestamp(profileId: profileId).then((
-      timestamp,
-    ) {
-      if (mounted) {
-        setState(() {
-          _oldestDate = timestamp == null
-              ? null
-              : DateTime.fromMillisecondsSinceEpoch(timestamp);
-        });
+    if (!mounted) return;
+    DateTime? oldest;
+    // The provider already holds the complete active-profile list. Read its
+    // published data so a late query cannot restore another profile's bounds.
+    for (final session in context.read<SessionProvider>().sessions) {
+      if (oldest == null || session.startTime.isBefore(oldest)) {
+        oldest = session.startTime;
       }
-    });
+    }
+    setState(() => _oldestDate = oldest);
   }
 
   void _refreshReportFutures(SessionProvider provider) {
@@ -425,33 +422,44 @@ class _StatsScreenState extends State<StatsScreen>
         .toList();
 
     if (filteredSessions.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.self_improvement,
-              size: 80,
-              color: AppColors.primaryLight.withAlpha(100),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              t.translate('history.noSessions'),
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w300),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              t.translate('history.noSessionsDesc'),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: AppColors.textSecondaryLight,
+      return Column(
+        children: [
+          // Keep the range controls reachable even when that range is empty.
+          _buildSessionsActionBar(context, provider, filteredSessions),
+          const Divider(height: 1),
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.self_improvement,
+                      size: 80,
+                      color: AppColors.primaryLight.withAlpha(100),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      t.translate('history.noSessions'),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.w300),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      t.translate('history.noSessionsDesc'),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
@@ -746,13 +754,17 @@ class _StatsScreenState extends State<StatsScreen>
 
   Future<void> _pickDate({required bool isStart}) async {
     final initial = isStart ? _sessionStartDate : _sessionEndDate;
+    final oldest = _oldestDate ?? DateTime(2000);
+    final tomorrow = TimeUtils.addDays(DateTime.now(), 1);
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: _oldestDate ?? DateTime(2000),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
+      // The default From date precedes the first session on a fresh install.
+      // DatePicker asserts unless its current selection is inside the bounds.
+      firstDate: initial.isBefore(oldest) ? initial : oldest,
+      lastDate: initial.isAfter(tomorrow) ? initial : tomorrow,
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         if (isStart) {
           _sessionStartDate = DateTime(picked.year, picked.month, picked.day);

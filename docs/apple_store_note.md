@@ -7,7 +7,7 @@ file. (File Name: ekatimer-ScreenRecording_iOS.mp4)
 Note: No user login, registration, or subscription is required to use the app.
 All features are fully functional right after launch.
 
-The recording demonstrates the following core flows of ekaTimer: 
+The recording demonstrates the following core flows of Meditation Timer:
 
 • App Launch & Welcome
 • Timer Configurations
@@ -25,7 +25,7 @@ The recording demonstrates the following core flows of ekaTimer:
 
 3. App Purpose & Target Audience
 ----------------------------------
-ekaTimer is a lightweight, clean, and highly customizable meditation companion.
+Meditation Timer is a lightweight, clean, and highly customizable meditation companion.
 It provides meditation practitioners with highly accurate, on-device session timing and statistical metrics without digital distractions.
 
 Key offerings include: 
@@ -47,11 +47,11 @@ practice.
 4. Setup & Access Instructions
 -------------------------------
 No account, login, cloud connection, or special configuration is required to
-access the app. ekaTimer works completely offline immediately upon installation.
+access the app. Meditation Timer works completely offline immediately upon installation.
 
 5. External Services & Tools
 -------------------------------
-ekaTimer is designed with a privacy-first, on-device architecture. It does not communicate with third-party servers, remote APIs, user analytics trackers, or artificial intelligence engines.
+Meditation Timer is designed with a privacy-first, on-device architecture. It does not communicate with third-party servers, remote APIs, user analytics trackers, or artificial intelligence engines.
 
 The app manages all computations locally: 
 • Database storage: on-device SQLite database (sqflite). 

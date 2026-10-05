@@ -152,7 +152,10 @@ class _SessionCardState extends State<SessionCard> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Row(
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           TimeUtils.formatDurationReadable(
@@ -163,8 +166,7 @@ class _SessionCardState extends State<SessionCard> {
                             color: theme.colorScheme.onSurface.withAlpha(150),
                           ),
                         ),
-                        if (qualityRating != null) ...[
-                          const SizedBox(width: 10),
+                        if (qualityRating != null)
                           QualityRatingLabel(
                             key: const ValueKey('session-quality'),
                             rating: qualityRating,
@@ -176,7 +178,6 @@ class _SessionCardState extends State<SessionCard> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ],
                       ],
                     ),
                     if (notes != null && notes.isNotEmpty) ...[

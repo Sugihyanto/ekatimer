@@ -1,11 +1,11 @@
 {
-    "name": "ekaTimer",
-    "short_name": "ekaTimer",
+    "name": "Meditation Timer",
+    "short_name": "Meditation Timer",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#123C5A",
+    "theme_color": "#123C5A",
+    "description": "Meditation Timer",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

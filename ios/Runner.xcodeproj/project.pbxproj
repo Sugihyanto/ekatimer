@@ -761,7 +761,7 @@
 				DEVELOPMENT_TEAM = UZ9CGUQ4RH;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ekaTimer;
+				INFOPLIST_KEY_CFBundleDisplayName = "Meditation Timer";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -954,7 +954,7 @@
 				DEVELOPMENT_TEAM = UZ9CGUQ4RH;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ekaTimer;
+				INFOPLIST_KEY_CFBundleDisplayName = "Meditation Timer";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -983,7 +983,7 @@
 				DEVELOPMENT_TEAM = UZ9CGUQ4RH;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ekaTimer;
+				INFOPLIST_KEY_CFBundleDisplayName = "Meditation Timer";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -1,0 +1,13 @@
+Meditation Timer 1.0.28
+Source snapshot prepared 2026-08-24
+
+This is an independently distributed modified version of Meditation Timer v1.0.20.
+Upstream source: https://github.com/vpnry/ekatimer
+Baseline commit: 0acc5e58a93c7b8082d4dab5e440468b4a599197
+
+This is not an official Meditation Timer release. No upstream endorsement is implied.
+The Android application ID is org.tipitakapali.ekatimer.
+
+This program is distributed under GNU General Public License version 3.
+See LICENSE for the complete terms, CHANGELOG.md for the recorded changes,
+and THIRD_PARTY_NOTICES.md for third-party attribution and asset caveats.

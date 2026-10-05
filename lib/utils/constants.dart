@@ -1,7 +1,7 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'ekaTimer';
+  static const String appName = 'Meditation Timer';
   static const String appVersion = '1.0.28';
 
   static const int defaultTimerDurationMinutes = 60;
@@ -10,7 +10,7 @@ class AppConstants {
   static const int timerTickIntervalMs = 500;
 
   static const String databaseName = 'meditation_timer.db';
-  static const int databaseVersion = 4;
+  static const int databaseVersion = 5;
 
   static const String prefTimerMode = 'timer_mode';
   static const String prefTimerDuration = 'timer_duration';

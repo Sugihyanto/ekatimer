@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// ekaTimer Design System
+/// Meditation Timer Design System
 /// A quiet dawn palette — cool, ethereal, breathable.
 class AppColors {
   // ── Primary: Dew-Drop Blue ──

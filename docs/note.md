@@ -1,4 +1,4 @@
-Our app ekaTimer is a meditation timer that requires background execution for the following user-initiated scenarios:
+Our app Meditation Timer is a meditation timer that requires background execution for the following user-initiated scenarios:
 
 1. Timer Completion Notification: 
 When a user starts a meditation session, the timer must continue running even when the screen is off or the user is not actively interacting with the app. The foreground service ensures the timer accurately tracks the session duration and notifies the user when their meditation session ends.

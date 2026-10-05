@@ -1,6 +1,6 @@
-# ekaTimer — Designed for meditators
+# Meditation Timer — Designed for meditators
 
-ekaTimer is free and open-source beautifully designed, full-featured meditation timer built for both beginners and experienced meditators. With support for multiple timer modes, rich sound options, haptic feedback, and detailed session tracking, ekaTimer helps you build and maintain a consistent meditation practice.
+Meditation Timer is free and open-source beautifully designed, full-featured meditation timer built for both beginners and experienced meditators. With support for multiple timer modes, rich sound options, haptic feedback, and detailed session tracking, Meditation Timer helps you build and maintain a consistent meditation practice.
 
 # Three Timer Modes: Timed, End At, Unlimited
 
@@ -50,13 +50,13 @@ Set a daily reminder notification to never miss your practice. Configurable to a
 
 # Privacy First
 
-Your meditation data stays on your device. No accounts, no sign-ups, no data collection. ekaTimer works completely offline.
+Your meditation data stays on your device. No accounts, no sign-ups, no data collection. Meditation Timer works completely offline.
 
 # Open Source
 
-ekaTimer is free and open-source software licensed under GPLv3. Inspired by Meditation Assistant by Trevor Slocum.
+Meditation Timer is free and open-source software licensed under GPLv3. Inspired by Meditation Assistant by Trevor Slocum.
 
 ---
 
 
-ekaTimer — Find your stillness, one breath at a time.
+Meditation Timer — Find your stillness, one breath at a time.

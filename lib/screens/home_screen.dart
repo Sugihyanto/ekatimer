@@ -35,6 +35,7 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
   late int _endAtMinute;
   TimerMode _selectedMode = TimerMode.timed;
   bool _initializedMode = false;
+  bool _startingSession = false;
 
   List<int> _fixedHourOptions = [60, 90, 120, 180];
   List<int> _recentSliderValues = [15, 30, 45, 60];
@@ -139,6 +140,9 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
                 clipBehavior: Clip.antiAlias,
                 child: Image.asset(
                   'assets/images/launch_image.png',
+                  // Decode at the 100 dp circle's size, not the 512 px source.
+                  cacheWidth: (100 * MediaQuery.devicePixelRatioOf(ctx))
+                      .round(),
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Icon(
                     Icons.nightlight_round,
@@ -254,6 +258,42 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
     _recentSliderValues[3] = minutes;
   }
 
+  void _setSliderMinutes(int minutes) {
+    setState(() {
+      _selectedDurationMinutes = minutes;
+      _updateLastRecent(minutes);
+    });
+  }
+
+  // Steps from the value the slider shows, so a preset longer than the
+  // slider's range steps down from its maximum, as a drag would.
+  int _steppedSliderMinutes(int step) =>
+      _selectedDurationMinutes.clamp(_sliderMin, _sliderMax) + step;
+
+  Widget _buildMinuteStepButton(TranslationService t, int step) {
+    final target = _steppedSliderMinutes(step);
+    final inRange = target >= _sliderMin && target <= _sliderMax;
+    return IconButton(
+      icon: Icon(
+        step < 0
+            ? Icons.remove_circle_outline_rounded
+            : Icons.add_circle_outline_rounded,
+      ),
+      color: Theme.of(context).colorScheme.primary,
+      visualDensity: VisualDensity.compact,
+      tooltip: t.translate(
+        step < 0 ? 'home.minusOneMinute' : 'home.plusOneMinute',
+      ),
+      // Recomputed on press: taps that land before the rebuild each step
+      // from the latest value instead of all repeating the same target.
+      onPressed: inRange
+          ? () => _setSliderMinutes(
+              _steppedSliderMinutes(step).clamp(_sliderMin, _sliderMax),
+            )
+          : null,
+    );
+  }
+
   void _addRecentSliderValue(int minutes) {
     _recentSliderValues.remove(minutes);
     _recentSliderValues.insert(0, minutes);
@@ -278,7 +318,10 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
   @override
   Widget build(BuildContext context) {
     final t = TranslationService.of(context);
-    final timerProvider = context.watch<TimerProvider>();
+    // Not watch: this screen shows no timer values, it only hands settings to
+    // the timer and starts sessions. Watching rebuilt it on every tick while it
+    // sat hidden under the meditation screen.
+    final timerProvider = Provider.of<TimerProvider>(context, listen: false);
     final settingsProvider = context.watch<SettingsProvider>();
 
     timerProvider.intervalMinutes =
@@ -339,21 +382,27 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
                         _navigateTo(context, const AlarmHelpScreen()),
                     tooltip: t.translate('alarmHelp.title'),
                   ),
-                  title: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        t.translate('app.splash.subtitle'),
-                        style: const TextStyle(fontWeight: FontWeight.w300),
-                      ),
-                      Text(
-                        t.translate('app.splash.timer'),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
+                  // The full product name is wider than the former short
+                  // mark. Scale it down on narrow phones so it never crowds
+                  // the leading and action buttons in the app bar.
+                  title: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          t.translate('app.splash.subtitle'),
+                          style: const TextStyle(fontWeight: FontWeight.w300),
                         ),
-                      ),
-                    ],
+                        Text(
+                          t.translate('app.splash.timer'),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   actions: [
                     IconButton(
@@ -590,10 +639,11 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
 
         const SizedBox(height: 16),
 
-        // Slider
+        // Slider. On a phone-width track 1–600 minutes moves several minutes
+        // per pixel of drag, so − and + give exact one-minute steps.
         Row(
           children: [
-            const SizedBox(width: 16),
+            _buildMinuteStepButton(t, -1),
             Text(
               '1',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -611,13 +661,7 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
                 max: _sliderMax.toDouble(),
                 divisions: _sliderMax - _sliderMin,
                 label: _formatMinutes(_selectedDurationMinutes, t),
-                onChanged: (value) {
-                  setState(() {
-                    final rounded = value.round();
-                    _selectedDurationMinutes = rounded;
-                    _updateLastRecent(rounded);
-                  });
-                },
+                onChanged: (value) => _setSliderMinutes(value.round()),
               ),
             ),
             Text(
@@ -627,7 +671,7 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
                 fontSize: 11,
               ),
             ),
-            const SizedBox(width: 16),
+            _buildMinuteStepButton(t, 1),
           ],
         ),
         Text(
@@ -816,7 +860,7 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
             color: AppColors.primary,
             child: InkWell(
               customBorder: const CircleBorder(),
-              onTap: () => _startSession(context),
+              onTap: _startingSession ? null : () => _startSession(context),
               child: Container(
                 width: 160,
                 height: 160,
@@ -880,38 +924,47 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
   }
 
   void _startSession(BuildContext context) async {
-    final timerProvider = context.read<TimerProvider>();
+    // Startup awaits native audio/alarm work. Ignore another tap until the
+    // same meditation route has finished, otherwise two timers/routes open.
+    if (_startingSession) return;
+    setState(() => _startingSession = true);
+    try {
+      final timerProvider = context.read<TimerProvider>();
 
-    if (_selectedMode == TimerMode.timed) {
-      _addRecentSliderValue(_selectedDurationMinutes);
+      if (_selectedMode == TimerMode.timed) {
+        _addRecentSliderValue(_selectedDurationMinutes);
 
-      timerProvider.configure(
-        mode: _selectedMode,
-        durationMinutes: _selectedDurationMinutes,
-      );
-    } else if (_selectedMode == TimerMode.endAt) {
-      timerProvider.configure(
-        mode: _selectedMode,
-        endAtHour: _endAtHour,
-        endAtMinute: _endAtMinute,
-      );
-    } else {
-      timerProvider.configure(mode: _selectedMode);
-    }
+        timerProvider.configure(
+          mode: _selectedMode,
+          durationMinutes: _selectedDurationMinutes,
+        );
+      } else if (_selectedMode == TimerMode.endAt) {
+        timerProvider.configure(
+          mode: _selectedMode,
+          endAtHour: _endAtHour,
+          endAtMinute: _endAtMinute,
+        );
+      } else {
+        timerProvider.configure(mode: _selectedMode);
+      }
 
-    await timerProvider.startSession();
+      await timerProvider.startSession();
 
-    if (context.mounted) {
-      Navigator.of(context).push(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              const MeditationScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
+      if (context.mounted) {
+        await Navigator.of(context).push(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const MeditationScreen(),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+            transitionDuration: const Duration(milliseconds: 500),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _startingSession = false);
     }
   }
 

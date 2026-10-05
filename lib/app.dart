@@ -100,7 +100,7 @@ class _MeditationTimerAppState extends State<MeditationTimerApp> {
           translations: _translations,
           locale: _locale,
           child: MaterialApp(
-            title: 'ekaTimer',
+            title: 'Meditation Timer',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
@@ -132,7 +132,7 @@ class _SplashScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'ekaTimer',
+              'Meditation Timer',
               style: Theme.of(
                 context,
               ).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w300),
@@ -288,6 +288,8 @@ class _AppEntryState extends State<_AppEntry> with WidgetsBindingObserver {
 
   Future<void> _checkForActiveSession() async {
     final timerProvider = context.read<TimerProvider>();
+    // Preserve the alarm marker before handleWidgetAction consumes the intent.
+    final widgetData = await WidgetActionHandler.getWidgetActionData();
 
     // ── 1. Handle widget-tap quick-start FIRST ────────────────────────────
     if (mounted) {
@@ -305,7 +307,6 @@ class _AppEntryState extends State<_AppEntry> with WidgetsBindingObserver {
     }
 
     // ── 2. Skip restore if launched from an alarm ─────────────────────────
-    final widgetData = await WidgetActionHandler.getWidgetActionData();
     if (widgetData?['fromAlarm'] == true) {
       if (mounted) {
         setState(() {

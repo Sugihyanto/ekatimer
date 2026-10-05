@@ -398,9 +398,12 @@ class _MeditationScreenState extends State<MeditationScreen>
                 AnimatedBuilder(
                   animation: _pulseAnimation,
                   builder: (context, child) {
-                    return Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: child,
+                    // Layered like _buildTimerWithPulse; see the note there.
+                    return RepaintBoundary(
+                      child: Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: RepaintBoundary(child: child),
+                      ),
                     );
                   },
                   child: Container(
@@ -661,7 +664,16 @@ class _MeditationScreenState extends State<MeditationScreen>
     return AnimatedBuilder(
       animation: _pulseAnimation,
       builder: (context, child) {
-        return Transform.scale(scale: _pulseAnimation.value, child: child);
+        // The pulse runs for the whole session at the display's refresh rate.
+        // With the scaled content and the scale in their own layers, a frame
+        // only re-composites a cached picture instead of repainting the whole
+        // meditation screen, arc and digits included, on every vsync.
+        return RepaintBoundary(
+          child: Transform.scale(
+            scale: _pulseAnimation.value,
+            child: RepaintBoundary(child: child),
+          ),
+        );
       },
       child: TimerDisplay(
         timeText: timerProvider.displayTime,

@@ -1707,7 +1707,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Here is the ekaTimer CSV format:',
+                'Here is the Meditation Timer CSV format:',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
               const SizedBox(height: 12),
@@ -1811,18 +1811,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── ekaTimer ─────────────────────────────────────────
-              _buildSectionLabel(context, 'ekaTimer'),
+              // ── Meditation Timer ─────────────────────────────────────────
+              _buildSectionLabel(context, 'Meditation Timer'),
               const SizedBox(height: 8),
               const Text(
-                'ekaTimer is distributed under the GNU General Public '
+                'Meditation Timer is distributed under the GNU General Public '
                 'License v3 (GPLv3).',
               ),
               const SizedBox(height: 8),
 
               Text(
                 'Modified source code is distributed with this release.\n'
-                'Upstream ekaTimer: https://github.com/vpnry/ekatimer',
+                'Upstream Meditation Timer: https://github.com/vpnry/ekatimer',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
 
@@ -1847,7 +1847,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildSectionLabel(context, 'Meditation Assistant'),
               const SizedBox(height: 8),
               const Text(
-                'ekaTimer was inspired by Meditation Assistant (GPLv3), '
+                'Meditation Timer was inspired by Meditation Assistant (GPLv3), '
                 'authored by Trevor Slocum, and re-implemented many concepts '
                 'from that project.',
               ),

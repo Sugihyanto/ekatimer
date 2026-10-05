@@ -78,7 +78,7 @@ class BackupService {
     if (decoded is! Map<String, dynamic> ||
         decoded['format'] != 'meditation-timer-backup' ||
         decoded['formatVersion'] != formatVersion) {
-      throw const FormatException('Unsupported ekaTimer backup.');
+      throw const FormatException('Unsupported Meditation Timer backup.');
     }
 
     final rawProfiles = decoded['profiles'];
@@ -122,7 +122,7 @@ class BackupService {
     final date =
         '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
     return FilePicker.platform.saveFile(
-      dialogTitle: 'Save ekaTimer backup',
+      dialogTitle: 'Save Meditation Timer backup',
       fileName: 'ekatimer_backup_$date.json',
       type: FileType.custom,
       allowedExtensions: const ['json'],

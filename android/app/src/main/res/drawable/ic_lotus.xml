@@ -1,5 +1,5 @@
 <!--
-  ekaTimer's lotus mark, as a flat silhouette. Used for notification small
+  Meditation Timer's lotus mark, as a flat silhouette. Used for notification small
   icons and for the home-screen widget, both of which recolor it at runtime.
 
   Android throws away the color of a notification's small icon and keeps only

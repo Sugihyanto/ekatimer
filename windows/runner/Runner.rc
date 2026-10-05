@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "org.tipitakapali" "\0"
-            VALUE "FileDescription", "meditation_timer" "\0"
+            VALUE "FileDescription", "Meditation Timer" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "meditation_timer" "\0"
+            VALUE "InternalName", "Meditation Timer" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 org.tipitakapali. All rights reserved." "\0"
             VALUE "OriginalFilename", "meditation_timer.exe" "\0"
-            VALUE "ProductName", "meditation_timer" "\0"
+            VALUE "ProductName", "Meditation Timer" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

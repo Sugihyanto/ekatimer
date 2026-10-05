@@ -1,179 +1,114 @@
-# ekaTimer
+# Meditation Timer
 
-A simple, distraction-free meditation timer built with Flutter.
+Meditation Timer is a distraction-free Flutter meditation timer distributed
+under the GNU General Public License version 3 (GPLv3).
 
-<img src="/images/home.png" width="180" alt="Home screen">&nbsp;
-<img src="/images/endat.png" width="180" alt="End-at screen">&nbsp;
-<img src="/images/statoverview.png" width="180" alt="Stats overview">
+This repository contains an independently distributed modified version of
+[Meditation Timer](https://github.com/vpnry/ekatimer), based on upstream tag
+`v1.0.20` (`0acc5e58a93c7b8082d4dab5e440468b4a599197`). It is not an official
+Meditation Timer release and no upstream endorsement is implied. The upstream project
+was inspired by Trevor Slocum's
+[Meditation Assistant](https://codeberg.org/tslocum/meditationassistant).
 
----
+## Release identity
 
-## Overview
+- Application name: `Meditation Timer`
+- Android application ID and namespace: `org.tipitakapali.ekatimer`
+- Release version: `1.0.28+28`
+- Android minimum SDK: 24
+- Android compile/target SDK used for the release: 36
 
-ekaTimer is inspired by Trevor Slocum's [Meditation Assistant](https://codeberg.org/tslocum/meditationassistant) and reimplements many of its features in Dart/Flutter. While it is not a fork, the original project was an important source of inspiration and is gratefully acknowledged.
+There is one Android application ID only. OEM Dual Apps/App Clone features use
+Android's user/profile isolation; this project does not create a second package.
+Availability of cloning is controlled by the device manufacturer.
 
-> This program is distributed in the hope that it will be useful, but **WITHOUT ANY WARRANTY**; without even the implied warranty of **MERCHANTABILITY** or **FITNESS FOR A PARTICULAR PURPOSE**.
+## Main features
 
----
+- Timed, End At, and Unlimited meditation sessions
+- Start, interval, and completion bells, vibration, alarms, and notifications
+- Android quick-start home-screen widgets
+- Multiple meditation profiles with isolated sessions and statistics
+- Optional Quality score from `0.0` through `5.0`, including fractional stars
+- Optional full-length session notes
+- Overview, session, weekly, monthly, and yearly reports
+- Weekly/monthly Calendar and Bar Chart views with a Quality visibility toggle
+- CSV and Excel export
+- JSON backup for profiles and sessions
+- Merge or Overwrite options when importing backup/CSV data
+- Light/dark themes and multilingual UI resources
 
-## Features
+## Source layout
 
-- Meditation timer with configurable sessions
-- Bell and interval notifications
-- Clean, minimalist interface
-- Cross-platform (Android & iOS)
-- Free and open-source (GPLv3)
+- `lib/` — Flutter application source
+- `android/` — Android application, widgets, and build scripts
+- `ios/`, `linux/`, `macos/`, `web/`, `windows/` — inherited Flutter platform projects
+- `assets/` — sounds, translations, quotes, and runtime images
+- `test/` — automated Flutter tests
+- `tools/` — release packaging tools
 
----
+Android is the primary validated release target for version 1.0.28. Other
+platform folders are included as source but were not release-qualified as part
+of this Android source export.
 
-## Building
+## Build
 
-### Android — signed release
+Recommended release environment:
 
-Create or edit `android/key.properties`:
+- Flutter 3.44.x stable (Dart 3.12.x)
+- Java 17
+- Android SDK 36
+- Gradle 9.4.1 through the included wrapper
 
-```text
-storePassword=your_store_password
-keyPassword=your_key_password
-keyAlias=your_key_alias
-storeFile=/path/to/your/keystore.jks
-```
-
-Then run the standard Flutter build command:
+From the project root:
 
 ```sh
-flutter build apk --release
-# or
-flutter build appbundle --release
+flutter pub get --enforce-lockfile
+flutter analyze
+flutter test --no-pub
+flutter build apk --release --target-platform android-arm64 --split-per-abi --no-pub
 ```
 
----
+The exact Dart/Flutter dependency versions and package hashes are recorded in
+`pubspec.lock`.
 
-## Project Structure
+On Windows, enable Developer Mode before preparing a clean checkout so Flutter
+can create the symlinks required by plugins.
 
-```
-ekatimer/
-  lib/
-    main.dart                          # Entry point
-    app.dart                           # App widget, routing, splash screen
-    providers/
-      timer_provider.dart              # Core timer state machine
-      settings_provider.dart           # Settings state management
-      session_provider.dart            # Session and statistics state
-    services/
-      alarm_service.dart               # Flutter-native alarm bridge
-      notification_service.dart        # Local notifications
-      audio_service.dart               # Sound playback (audioplayers)
-      vibration_service.dart           # Haptic feedback
-      persistence_service.dart         # SharedPreferences key-value store
-      database_service.dart            # SQLite via sqflite
-      widget_data_service.dart         # Home widget data initialisation
-      widget_action_handler.dart       # Widget tap → timer start bridge
-      translation_service.dart         # i18n via JSON files
-    models/
-      timer_mode.dart                  # Enum: timed, endAt, unlimited
-      meditation_session.dart          # Session data model
-      app_settings.dart                # User settings model
-      sound_config.dart                # Sound configuration
-      vibration_config.dart            # Vibration configuration
-    screens/
-      home_screen.dart                 # Timer setup and start
-      meditation_screen.dart           # Active timer display
-      complete_screen.dart             # Post-session summary
-      settings_screen.dart             # App settings
-      history_screen.dart              # Session history list
-      stats_screen.dart                # Charts and statistics
-    widgets/
-      timer_display.dart               # Circular countdown widget
-      sound_picker.dart                # Sound selection UI
-      vibration_picker.dart            # Vibration selection UI
-      session_card.dart                # History list item
-      stats_summary.dart               # Home screen stats card
-      edit_fixed_presets_dialog.dart   # Duration preset editor
-    theme/
-      app_theme.dart                   # ThemeData (light/dark)
-      colors.dart                      # Colour palette
-    utils/
-      constants.dart                   # App-wide constants
-      time_utils.dart                  # Time formatting helpers
-  android/
-    app/src/main/
-      kotlin/org/tipitakapali/ekatimer/
-        MainActivity.kt                # Flutter activity + alarm initialisation
-        AlarmSchedulerPlugin.kt        # AlarmManager, WakeLock, MediaPlayer
-        MeditationTimerWidget.kt       # Android home widget providers
-      AndroidManifest.xml              # Permissions, receivers, widget declarations
-      res/                             # Layouts, drawables, widget configs
-  ios/
-    Runner/
-      AppDelegate.swift                # Alarm, notification, background handling
-      SceneDelegate.swift              # Widget URL deep-link handler
-      MeditationTimerDeepLink.swift    # ekatimer:// URL scheme handler
-      Info.plist                       # Bundle config and background modes
-    MeditationWidget/
-      MeditationWidget.swift           # iOS home widget views
-      MeditationWidgetBundle.swift     # Widget bundle entry point
-  pubspec.yaml                         # Flutter dependencies
-  assets/
-    sounds/                            # WAV audio files
-    translations/                      # JSON i18n files
-```
+### Signing
 
+No keystore, signing password, `key.properties`, or `local.properties` is
+included in the public source package. If `android/key.properties` is absent,
+the release APK remains unsigned. Use a debug build for local sideloading; do
+not publish it or substitute a debug certificate for the production key.
 
-```bash 
- sips -g pixelWidth -
-g pixelHeight android/app/src/main/res/mipmap-nodpi/launch_ima
-ge.png
+See [SOURCE_RELEASE.md](SOURCE_RELEASE.md) for build and publication details.
 
-~/pnry_dev/ekaTimer_Meditation_Timer/android/app/src/main/res/mipmap-nodpi/launch_image.png
-  pixelWidth: 512
-  pixelHeight: 512
+## Data backup scope
 
-➜  ekaTimer_Meditation_Timer git:(main) SRC="android/app/src/m
-ain/res/mipmap-nodpi/launch_image.png" && for pair in "mdpi:10
-8" "hdpi:162" "xhdpi:216" "xxhdpi:324" "xxxhdpi:432"; do den=$
-{pair%%:*} && sz=${pair##*:} && DST="android/app/src/main/res/
-drawable-${den}/ic_launcher_foreground.png" && echo "Generatin
-g ${den} (${sz}×${sz}) -> ${DST}" && sips -z $sz $sz "$SRC" --
-out "$DST" 2>&1; done
-```
-
----
+The JSON backup contains profiles, the active profile identifier, and all
+meditation sessions. It does not contain general settings such as timer
+defaults, sounds, vibration, theme, locale, widgets, schedules, or an active
+timer. CSV import/export is scoped to the active profile.
 
 ## Attribution
 
-### Meditation Assistant
-
-ekaTimer is a Dart/Flutter reimplementation inspired by Meditation Assistant, originally authored by Trevor Slocum. While ekaTimer is not a fork, many of its features and behaviours were derived from studying and reimplementing concepts found in that project.
-
-- **Author:** Trevor Slocum
-- **Source:** https://codeberg.org/tslocum/meditationassistant
-
-### Audio
-
-**CC0 1.0 Universal (Public Domain)**
-`bell.wav`, `gardenbird.wav`, `bowl.wav`, `bowlstrong.wav`, `watch.wav`
-— Joseph Sardin ([BigSoundBank.com](https://bigsoundbank.com))
-
-**Creative Commons Attribution 4.0**
-
-| File | Author | Source |
-|---|---|---|
-| `ThreeBowl.wav` | naturenotesuk | https://freesound.org/s/667491/ |
-| `gong.wav` | reinsamba | https://freesound.org/s/46062/ |
-
----
+Project and asset attributions are recorded in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and are also shown inside the
+application. Individual third-party components and assets remain under their
+respective licenses.
 
 ## License
 
-ekaTimer is licensed under the **GNU General Public License v3.0 (GPLv3)**.
+The application source is distributed under the
+[GNU General Public License version 3](LICENSE). Preserve the license, existing
+notices, attribution, and source availability when redistributing modified or
+binary versions.
 
-It is distributed under GPLv3 in recognition of the GPLv3 licence applied to Meditation Assistant by Trevor Slocum, and to ensure that users continue to enjoy the same freedoms to use, study, modify, and share the software.
+This program is provided without warranty; see the GPLv3 text for details.
 
-See the [LICENSE](LICENSE) file for the full licence text.
+## Upstream source
 
----
-
-## Source Code
-
-GitHub: https://github.com/vpnry/ekatimer
+- Meditation Timer: https://github.com/vpnry/ekatimer
+- Baseline: tag `v1.0.20`, commit
+  `0acc5e58a93c7b8082d4dab5e440468b4a599197`
+- Meditation Assistant: https://codeberg.org/tslocum/meditationassistant

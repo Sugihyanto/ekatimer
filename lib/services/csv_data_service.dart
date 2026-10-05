@@ -64,8 +64,8 @@ class CsvDataService {
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path)],
-        subject: 'ekaTimer Session Data',
-        text: 'Meditation session data from ekaTimer',
+        subject: 'Meditation Timer Session Data',
+        text: 'Meditation session data from Meditation Timer',
       ),
     );
 

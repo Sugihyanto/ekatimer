@@ -224,6 +224,27 @@ replay_pid*
 
 # Kotlin Gradle plugin data, see https://kotlinlang.org/docs/whatsnew20.html#new-directory-for-kotlin-data-in-gradle-projects
 .kotlin/
+
+# Keep the Gradle wrapper in public source releases so the Android project can
+# be built without relying on an unversioned local Gradle installation.
+!android/gradlew
+!android/gradlew.bat
+!android/gradle/wrapper/gradle-wrapper.jar
+!pubspec.lock
+
+# Public-release safety
+/dist/
+# Signed APK/AAB bundles and store material staged for upload.
+/outputs/
+.env
+.env.*
+*.p12
+*.pfx
+*.pem
+*.key
+*.bak
+GoogleService-Info.plist
+service-account*.json
 # Gradle files
 .gradle/
 build/

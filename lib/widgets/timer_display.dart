@@ -70,66 +70,75 @@ class TimerDisplay extends StatelessWidget {
                 ),
               Padding(
                 padding: EdgeInsets.all(innerPadding),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AnimatedOpacity(
-                      opacity: isPaused ? 0.4 : 1.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          timeText,
-                          style: TextStyle(
-                            fontSize: timeFontSize,
-                            fontWeight: FontWeight.w200,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            letterSpacing: 4,
+                // The badge and subtitle must fit as well as the digits when
+                // a landscape circle is small or accessibility text is large.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: SizedBox(
+                    width: size - innerPadding * 2,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedOpacity(
+                          opacity: isPaused ? 0.4 : 1.0,
+                          duration: const Duration(milliseconds: 300),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              timeText,
+                              style: TextStyle(
+                                fontSize: timeFontSize,
+                                fontWeight: FontWeight.w200,
+                                color: Theme.of(context).colorScheme.onSurface,
+                                letterSpacing: 4,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        if (subtitleLabel != null &&
+                            subtitleValue != null &&
+                            subtitleValue!.isNotEmpty) ...[
+                          SizedBox(height: gapSmall),
+                          Text(
+                            '$subtitleLabel: $subtitleValue',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: subtitleFontSize,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withAlpha(150),
+                            ),
+                          ),
+                        ],
+                        if (isPaused) ...[
+                          SizedBox(height: gapLarge),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: badgeHPadding,
+                              vertical: badgeVPadding,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withAlpha(30),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              TranslationService.of(
+                                context,
+                              ).translate('meditation.paused'),
+                              style: TextStyle(
+                                fontSize: badgeFontSize,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.primary,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (subtitleLabel != null &&
-                        subtitleValue != null &&
-                        subtitleValue!.isNotEmpty) ...[
-                      SizedBox(height: gapSmall),
-                      Text(
-                        '$subtitleLabel: $subtitleValue',
-                        style: TextStyle(
-                          fontSize: subtitleFontSize,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withAlpha(150),
-                        ),
-                      ),
-                    ],
-                    if (isPaused) ...[
-                      SizedBox(height: gapLarge),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: badgeHPadding,
-                          vertical: badgeVPadding,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary.withAlpha(30),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          TranslationService.of(
-                            context,
-                          ).translate('meditation.paused'),
-                          style: TextStyle(
-                            fontSize: badgeFontSize,
-                            fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.primary,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ],

@@ -43,10 +43,12 @@ class _CompleteScreenState extends State<CompleteScreen>
   bool _qualitySaving = false;
   bool _allowPop = false;
   bool _exitInProgress = false;
+  late int _displayedDurationSeconds;
 
   @override
   void initState() {
     super.initState();
+    _displayedDurationSeconds = widget.durationSeconds;
     _qualityController = TextEditingController();
     _notesController = TextEditingController();
     _controller = AnimationController(
@@ -221,6 +223,8 @@ class _CompleteScreenState extends State<CompleteScreen>
 
     await _enableRoutePop();
     if (!mounted) return;
+    await context.read<TimerProvider>().stopSounds();
+    if (!mounted) return;
     Navigator.of(context).pop(result);
   }
 
@@ -336,7 +340,7 @@ class _CompleteScreenState extends State<CompleteScreen>
                                 const SizedBox(height: 8),
                                 Text(
                                   TimeUtils.formatDuration(
-                                    widget.durationSeconds,
+                                    _displayedDurationSeconds,
                                   ),
                                   style: Theme.of(context)
                                       .textTheme
@@ -351,7 +355,7 @@ class _CompleteScreenState extends State<CompleteScreen>
                                 const SizedBox(height: 4),
                                 Text(
                                   TimeUtils.formatDurationReadable(
-                                    widget.durationSeconds,
+                                    _displayedDurationSeconds,
                                   ),
                                   style: Theme.of(context).textTheme.bodyLarge
                                       ?.copyWith(
@@ -477,6 +481,7 @@ class _CompleteScreenState extends State<CompleteScreen>
       session = _findCurrentSession(provider);
     }
     if (!mounted || session == null) return;
+    setState(() => _displayedDurationSeconds = session!.durationSeconds);
     _qualityController.text = session.quality ?? '';
     _notesController.text = session.notes ?? '';
   }
@@ -585,6 +590,8 @@ class _CompleteScreenState extends State<CompleteScreen>
     final updated = await showEditSessionDialog(context, session);
     if (updated != null && context.mounted) {
       await sessionProvider.updateSession(updated);
+      if (!context.mounted) return;
+      setState(() => _displayedDurationSeconds = updated.durationSeconds);
       _qualityController.text = updated.quality ?? '';
       _notesController.text = updated.notes ?? '';
       if (context.mounted) {

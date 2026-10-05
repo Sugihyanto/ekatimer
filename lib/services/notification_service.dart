@@ -67,7 +67,7 @@ class NotificationService {
       priority: Priority.high,
       icon: '@drawable/ic_lotus',
       // Tints the silhouette and the app name in the notification shade with
-      // ekaTimer's teal instead of the system default grey.
+      // Meditation Timer's teal instead of the system default grey.
       color: Color(0xFF176B6B),
       colorized: false,
     );

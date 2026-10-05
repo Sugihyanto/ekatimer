@@ -13,6 +13,13 @@ import '../models/meditation_session.dart';
 class DatabaseService {
   static Database? _database;
 
+  // Nearly every read is one profile's sessions by time: the history list is
+  // ordered by startTime and the charts ask for week, month and year ranges.
+  // Without this index each such query scans and sorts the whole table.
+  static const _profileStartIndex =
+      'CREATE INDEX IF NOT EXISTS idx_sessions_profile_start '
+      'ON sessions(profileId, startTime)';
+
   static Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
@@ -46,6 +53,7 @@ class DatabaseService {
         notes TEXT
       )
     ''');
+    await db.execute(_profileStartIndex);
   }
 
   static Future<void> _onUpgrade(
@@ -64,6 +72,9 @@ class DatabaseService {
       await db.execute(
         "ALTER TABLE sessions ADD COLUMN profileId TEXT NOT NULL DEFAULT 'default'",
       );
+    }
+    if (oldVersion < 5) {
+      await db.execute(_profileStartIndex);
     }
   }
 

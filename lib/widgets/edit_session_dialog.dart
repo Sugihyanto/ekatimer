@@ -7,7 +7,6 @@ import '../models/meditation_session.dart';
 import '../services/translation_service.dart';
 import '../theme/colors.dart';
 import '../theme/app_theme.dart';
-import '../services/database_service.dart';
 import '../utils/sitting_quality.dart';
 import 'sitting_quality_input.dart';
 
@@ -58,8 +57,6 @@ class _EditSessionDialogState extends State<_EditSessionDialog> {
   bool _showStartTimePicker = false;
   bool _showDurationPicker = false;
 
-  DateTime? _pickerFirstDate;
-
   @override
   void initState() {
     super.initState();
@@ -96,17 +93,6 @@ class _EditSessionDialogState extends State<_EditSessionDialog> {
     _durationSecondCtrl = FixedExtentScrollController(
       initialItem: _durationSeconds,
     );
-
-    // Pre-fetch the oldest session timestamp for the date picker min date.
-    DatabaseService.getOldestSessionTimestamp(
-      profileId: widget.session.profileId,
-    ).then((timestamp) {
-      if (timestamp != null && mounted) {
-        setState(() {
-          _pickerFirstDate = DateTime.fromMillisecondsSinceEpoch(timestamp);
-        });
-      }
-    });
   }
 
   @override
@@ -549,21 +535,28 @@ class _EditSessionDialogState extends State<_EditSessionDialog> {
   }
 
   Future<void> _pickDate() async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final baseline = DateTime(2000);
+    // An existing record may be older than the default range or imported
+    // with a future date. Always let the user open it and correct its date.
+    final originalDate = DateUtils.dateOnly(widget.session.startTime);
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: _pickerFirstDate ?? DateTime(2000),
-      lastDate: DateTime.now(),
+      firstDate: originalDate.isBefore(baseline) ? originalDate : baseline,
+      lastDate: originalDate.isAfter(today) ? originalDate : today,
       builder: (ctx, child) {
         return Theme(
           data: Theme.of(ctx).copyWith(
-            colorScheme: ColorScheme.light(primary: AppColors.primary),
+            colorScheme: Theme.of(
+              ctx,
+            ).colorScheme.copyWith(primary: AppColors.primary),
           ),
           child: child!,
         );
       },
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() => _selectedDate = picked);
     }
   }
@@ -594,7 +587,7 @@ class _EditSessionDialogState extends State<_EditSessionDialog> {
       return;
     }
 
-    final newStartTime = DateTime(
+    final selectedStartTime = DateTime(
       _selectedDate.year,
       _selectedDate.month,
       _selectedDate.day,
@@ -603,9 +596,23 @@ class _EditSessionDialogState extends State<_EditSessionDialog> {
       _startSecond,
     );
 
-    final newEndTime = newStartTime.add(
-      Duration(seconds: totalDurationSeconds),
+    final original = widget.session;
+    final originalWholeSecond = DateTime(
+      original.startTime.year,
+      original.startTime.month,
+      original.startTime.day,
+      original.startTime.hour,
+      original.startTime.minute,
+      original.startTime.second,
     );
+    final startChanged = selectedStartTime != originalWholeSecond;
+    final durationChanged = totalDurationSeconds != original.durationSeconds;
+    final newStartTime = startChanged ? selectedStartTime : original.startTime;
+    // Editing Quality/notes must not discard pauses or timestamp precision.
+    // Recompute the end only when the user changes a time field.
+    final newEndTime = startChanged || durationChanged
+        ? newStartTime.add(Duration(seconds: totalDurationSeconds))
+        : original.endTime;
     final quality = SittingQuality.normalize(_qualityController.text);
     final notes = _notes.trim().isNotEmpty ? _notes.trim() : null;
 

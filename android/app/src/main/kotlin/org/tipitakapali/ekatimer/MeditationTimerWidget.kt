@@ -132,9 +132,6 @@ open class MeditationTimerWidget : AppWidgetProvider() {
         // Key used for native-side SharedPreferences persistence
         private const val COMPANION_PREFS_TRANSPARENT = "transparent_widget"
 
-        // ekaTimer's teal, matching AppColors.primary on the Flutter side.
-        private const val BRAND_TEAL = 0xFF176B6B.toInt()
-
         /// Force-update all widget types with the given transparency value.
         ///
         /// The [transparent] flag is passed directly from Flutter and also
@@ -200,9 +197,28 @@ open class MeditationTimerWidget : AppWidgetProvider() {
             transparent: Boolean = false,
         ): RemoteViews {
         val views = RemoteViews(context.packageName, config.layoutRes)
+        // Render the artwork inside a circular mask; screenshot-style backgrounds
+        // outside the glass rim must never appear on the home screen.
+        val source = android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.widget_circle)
+        val art = android.graphics.Bitmap.createBitmap(256, 256, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(art)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG)
+        canvas.drawCircle(128f, 128f, 128f, paint)
+        paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+        canvas.drawBitmap(source,
+            android.graphics.Rect((source.width * .024f).toInt(), (source.height * .018f).toInt(),
+                (source.width * .973f).toInt(), (source.height * .950f).toInt()),
+            android.graphics.RectF(0f, 0f, 256f, 256f), paint)
+        source.recycle()
+        views.setImageViewBitmap(R.id.widget_logo, art)
 
         // Set the label on the shared quick-start layout
-        views.setTextViewText(R.id.widget_action_label, config.actionLabel)
+        val durationLabel = if (config.timerMode == "timed") {
+            if (config.timerDuration < 60) "${config.timerDuration}:00"
+            else "${config.timerDuration / 60}:${(config.timerDuration % 60).toString().padStart(2, '0')}:00"
+        } else config.actionLabel
+        views.setTextViewText(R.id.widget_action_label, durationLabel)
+        views.setInt(R.id.widget_logo, "setImageAlpha", if (transparent) 150 else 255)
 
         // Apply transparency – use android.R.color.transparent for the
         // background so the widget blends with the user's wallpaper.
@@ -212,23 +228,13 @@ open class MeditationTimerWidget : AppWidgetProvider() {
                 "setBackgroundResource",
                 android.R.color.transparent
             )
-            // The layout's textColorPrimary follows the launcher's theme, not
-            // the wallpaper the label now sits on, so it disappeared against
-            // any wallpaper of similar tone. White plus the layout's shadow
-            // reads on both light and dark ones. The opaque branch leaves the
-            // colour alone: RemoteViews are rebuilt from the layout on every
-            // update, so the themed colour comes back on its own.
             views.setTextColor(R.id.widget_action_label, Color.WHITE)
-            // ic_lotus ships uncoloured so each caller can tint it; match the
-            // label so the mark does not vanish where the text survives.
-            views.setInt(R.id.widget_logo, "setColorFilter", Color.WHITE)
         } else {
-            views.setInt(R.id.widget_logo, "setColorFilter", BRAND_TEAL)
             // Restore the normal styled background drawable
             views.setInt(
                 R.id.widget_container,
                 "setBackgroundResource",
-                R.drawable.widget_bg
+                android.R.color.transparent
             )
         }
 
@@ -257,6 +263,7 @@ open class MeditationTimerWidget : AppWidgetProvider() {
             pendingIntentFlags
         )
         views.setOnClickPendingIntent(R.id.widget_container, pendingIntent)
+        views.setOnClickPendingIntent(R.id.widget_play, pendingIntent)
 
         return views
     }
