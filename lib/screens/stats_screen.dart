@@ -10,10 +10,12 @@ import '../theme/colors.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_utils.dart';
 import '../models/meditation_session.dart';
+import '../widgets/adaptive_layout.dart';
 import '../widgets/session_card.dart';
 import '../widgets/edit_session_dialog.dart';
 import '../widgets/practice_stats_table.dart';
 import '../widgets/quality_rating_label.dart';
+import '../utils/responsive.dart';
 import '../utils/sitting_quality.dart';
 import '../utils/session_calendar.dart';
 
@@ -159,37 +161,106 @@ class _StatsScreenState extends State<StatsScreen>
             MediaQuery.platformBrightnessOf(context) == Brightness.dark);
     final theme = isDark ? AppTheme.darkTheme : AppTheme.lightTheme;
 
+    final reports = _reports(t);
+    final canSplit = WindowSize.of(context).canSplit;
+
     return Theme(
       data: theme,
       child: Scaffold(
         appBar: AppBar(
           title: Text(t.translate('stats.title')),
           // Delete-all button is inside the Sessions tab
-          bottom: TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            labelPadding: const EdgeInsets.symmetric(horizontal: 18),
-            tabs: [
-              Tab(text: t.translate('stats.overview')),
-              Tab(text: t.translate('stats.sessions')),
-              Tab(text: t.translate('stats.weekly')),
-              Tab(text: t.translate('stats.monthly')),
-              Tab(text: t.translate('stats.yearly')),
-            ],
-          ),
+          //
+          // The tab strip goes away once the reports move into a sidebar. Five
+          // scrolling tabs across an iPad spend the width on empty label
+          // padding, and the ones off the end stay hidden behind a scroll.
+          bottom: canSplit
+              ? null
+              : TabBar(
+                  controller: _tabController,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 18),
+                  tabs: [for (final report in reports) Tab(text: report.label)],
+                ),
         ),
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildOverviewTab(context, sessionProvider),
-            _buildSessionsTab(context, sessionProvider),
-            _buildWeeklyTab(context, sessionProvider),
-            _buildMonthlyTab(context, sessionProvider),
-            _buildYearlyTab(context, sessionProvider),
-          ],
-        ),
+        body: canSplit
+            ? _buildSplitReports(context, sessionProvider, reports)
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  for (var index = 0; index < reports.length; index++)
+                    _buildReport(context, sessionProvider, index),
+                ],
+              ),
       ),
+    );
+  }
+
+  /// The five reports, in tab order. Shared by the tab strip and the sidebar so
+  /// the two cannot drift apart.
+  List<({IconData icon, String label})> _reports(TranslationService t) => [
+    (icon: Icons.insights_outlined, label: t.translate('stats.overview')),
+    (icon: Icons.list_alt_outlined, label: t.translate('stats.sessions')),
+    (
+      icon: Icons.calendar_view_week_outlined,
+      label: t.translate('stats.weekly'),
+    ),
+    (icon: Icons.calendar_month_outlined, label: t.translate('stats.monthly')),
+    (icon: Icons.calendar_today_outlined, label: t.translate('stats.yearly')),
+  ];
+
+  Widget _buildReport(
+    BuildContext context,
+    SessionProvider provider,
+    int index,
+  ) => switch (index) {
+    0 => _buildOverviewTab(context, provider),
+    1 => _buildSessionsTab(context, provider),
+    2 => _buildWeeklyTab(context, provider),
+    3 => _buildMonthlyTab(context, provider),
+    _ => _buildYearlyTab(context, provider),
+  };
+
+  /// iPads: the report list beside the report.
+  ///
+  /// Selection still lives in [_tabController], so rotating between this and the
+  /// tab strip keeps whichever report was open.
+  Widget _buildSplitReports(
+    BuildContext context,
+    SessionProvider provider,
+    List<({IconData icon, String label})> reports,
+  ) {
+    return ListenableBuilder(
+      listenable: _tabController,
+      builder: (context, _) {
+        final selected = _tabController.index;
+        return TwoPaneLayout(
+          startFlex: 2,
+          endFlex: 5,
+          startMaxWidth: 280,
+          start: ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: reports.length,
+            itemBuilder: (context, index) {
+              final report = reports[index];
+              return ListTile(
+                leading: Icon(report.icon),
+                title: Text(report.label),
+                selected: index == selected,
+                selectedTileColor: AppColors.primary.withValues(alpha: 0.08),
+                onTap: () => _tabController.index = index,
+              );
+            },
+          ),
+          // Keyed so switching reports rebuilds the pane from the top rather
+          // than carrying the previous report's scroll offset into it.
+          end: KeyedSubtree(
+            key: ValueKey<int>(selected),
+            child: _buildReport(context, provider, selected),
+          ),
+        );
+      },
     );
   }
 
@@ -1203,50 +1274,62 @@ class _StatsScreenState extends State<StatsScreen>
           return const Center(child: CircularProgressIndicator());
         }
         final data = snapshot.data!;
-        final minimumChartWidth = MediaQuery.sizeOf(context).width - 40;
-        final chartWidth = qualityRatingBuilder == null
-            ? minimumChartWidth
-            : (data.length * 52.0).clamp(minimumChartWidth, double.infinity);
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                TranslationService.of(context).translate(titleKey),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 24),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: chartWidth,
-                  height: 260,
-                  child: _buildBarChart(
-                    context,
-                    data: data,
-                    barColor: barColor,
-                    onBarTap: onBarTap,
-                    qualityRatingBuilder: qualityRatingBuilder,
+        // Measured from the space this chart is actually given, not from the
+        // window. On an iPad the report sits in a pane narrower than the
+        // screen, and sizing the chart to the window would push it past the
+        // pane's right edge.
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final minimumChartWidth = constraints.maxWidth - 40;
+            final chartWidth = qualityRatingBuilder == null
+                ? minimumChartWidth
+                : (data.length * 52.0).clamp(
+                    minimumChartWidth,
+                    double.infinity,
+                  );
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    TranslationService.of(context).translate(titleKey),
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                ),
-              ),
-              if (onBarTap != null) ...[
-                const SizedBox(height: 12),
-                Center(
-                  child: Text(
-                    TranslationService.of(
-                      context,
-                    ).translate('stats.tapBarHint'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 24),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: chartWidth,
+                      height: 260,
+                      child: _buildBarChart(
+                        context,
+                        data: data,
+                        barColor: barColor,
+                        onBarTap: onBarTap,
+                        qualityRatingBuilder: qualityRatingBuilder,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ],
-          ),
+                  if (onBarTap != null) ...[
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Text(
+                        TranslationService.of(
+                          context,
+                        ).translate('stats.tapBarHint'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
         );
       },
     );

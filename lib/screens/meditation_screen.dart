@@ -9,6 +9,7 @@ import '../providers/settings_provider.dart';
 import '../models/timer_mode.dart';
 import '../services/translation_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive.dart';
 import '../utils/time_utils.dart';
 import '../widgets/timer_display.dart';
 import 'complete_screen.dart';
@@ -503,11 +504,26 @@ class _MeditationScreenState extends State<MeditationScreen>
     SessionProvider sessionProvider,
     double progress,
   ) {
+    // A 280pt dial fills a phone and is lost in the middle of an iPad. Grow it
+    // with the window instead of leaving the one thing the screen exists to
+    // show as a small disc in a large empty field.
+    final circleSize = switch (WindowSize.of(context)) {
+      WindowSize.compact => 280.0,
+      WindowSize.medium => 320.0,
+      WindowSize.expanded => 420.0,
+    };
+
     return Column(
       children: [
         _buildTopBar(t, timerProvider),
         const Spacer(),
-        _buildTimerWithPulse(t, timerProvider, sessionProvider, progress),
+        _buildTimerWithPulse(
+          t,
+          timerProvider,
+          sessionProvider,
+          progress,
+          circleSize: circleSize,
+        ),
         // Show "End at: {time}" below the circle for End At mode
         if (timerProvider.timerMode == TimerMode.endAt &&
             timerProvider.endTime != null)
@@ -538,8 +554,15 @@ class _MeditationScreenState extends State<MeditationScreen>
               // Account for ~40px of endAt text below the circle if visible
               final availableHeight =
                   constraints.maxHeight - (hasEndAt ? 40.0 : 0.0) - 16.0;
-              // Use up to 180px, but shrink to fit smaller screens
-              final circleSize = availableHeight.clamp(120.0, 180.0);
+              // Shrink to fit small screens, but let the ceiling follow the
+              // window: 180 is sized for a phone on its side, and holding an
+              // iPad to it wastes most of a 1024pt-tall landscape screen.
+              final maxCircle = switch (WindowSize.of(context)) {
+                WindowSize.compact => 180.0,
+                WindowSize.medium => 240.0,
+                WindowSize.expanded => 360.0,
+              };
+              final circleSize = availableHeight.clamp(120.0, maxCircle);
 
               return Row(
                 mainAxisAlignment: MainAxisAlignment.center,

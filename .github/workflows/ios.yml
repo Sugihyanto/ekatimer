@@ -1,0 +1,98 @@
+name: iOS
+
+# Building for iPhone and iPad needs macOS and Xcode, which the development
+# machine for this project is not. This workflow is where the iOS side gets
+# compiled and where the test suite runs.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: 3.44.7
+
+jobs:
+  # Analyser and tests run on Linux: they need no Xcode, and a Linux runner is
+  # a tenth the cost of a macOS one.
+  test:
+    name: Analyse and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter analyze
+
+      # Includes test/ipad_layout_test.dart, which pumps the screens at iPad
+      # sizes. Those cannot run on the Windows development machine, where the
+      # Flutter SDK sits under a path with a space in it and the Dart hooks
+      # runner fails to quote it.
+      - run: flutter test --reporter expanded
+
+  ios:
+    name: Build for iPhone and iPad
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # The repository ships upstream's Apple identity in
+      # ios/Flutter/Identity.xcconfig so a clean clone builds. The real identity
+      # lives in the untracked local override, which CI writes from secrets.
+      #
+      # With the secrets unset the build still runs, unsigned, under upstream's
+      # defaults — useful as a compile check before an Apple account is wired
+      # up. Set APP_BUNDLE_ID, APP_GROUP_ID and APP_DEVELOPMENT_TEAM in the
+      # repository's secrets to build under your own.
+      - name: Write the local Apple identity
+        env:
+          APP_BUNDLE_ID: ${{ secrets.APP_BUNDLE_ID }}
+          APP_GROUP_ID: ${{ secrets.APP_GROUP_ID }}
+          APP_DEVELOPMENT_TEAM: ${{ secrets.APP_DEVELOPMENT_TEAM }}
+        run: |
+          if [ -z "$APP_BUNDLE_ID" ]; then
+            echo "No APP_BUNDLE_ID secret; building with the repository defaults."
+            exit 0
+          fi
+          cat > ios/Flutter/Identity.local.xcconfig <<EOF
+          APP_BUNDLE_ID = $APP_BUNDLE_ID
+          APP_GROUP_ID = $APP_GROUP_ID
+          APP_DEVELOPMENT_TEAM = $APP_DEVELOPMENT_TEAM
+          EOF
+          echo "Building as $APP_BUNDLE_ID"
+
+      - run: flutter pub get
+
+      - name: Show the resolved identity
+        run: |
+          cd ios
+          xcodebuild -showBuildSettings -project Runner.xcodeproj -target Runner 2>/dev/null \
+            | grep -E 'PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM|MARKETING_VERSION|CURRENT_PROJECT_VERSION' \
+            || true
+
+      # Unsigned: a signed build needs a distribution certificate and
+      # provisioning profiles in the keychain, which is a separate step to add
+      # once the bundle ID and app group exist in the Apple Developer account.
+      # This proves the app and the widget extension compile for a device.
+      - name: Build (unsigned archive)
+        run: flutter build ipa --release --no-codesign
+
+      - name: Upload the archive
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Runner-xcarchive
+          path: build/ios/archive/Runner.xcarchive
+          if-no-files-found: warn
+          retention-days: 14

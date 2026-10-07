@@ -12,7 +12,9 @@ import '../theme/colors.dart';
 import '../theme/app_theme.dart';
 import '../services/persistence_service.dart';
 import '../services/widget_action_handler.dart';
+import '../utils/responsive.dart';
 
+import '../widgets/adaptive_layout.dart';
 import '../widgets/edit_fixed_presets_dialog.dart';
 import 'meditation_screen.dart';
 import 'stats_screen.dart';
@@ -317,7 +319,6 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final t = TranslationService.of(context);
     // Not watch: this screen shows no timer values, it only hands settings to
     // the timer and starts sessions. Watching rebuilt it on every tick while it
     // sat hidden under the meditation screen.
@@ -366,81 +367,155 @@ class _MeditationHomeScreenState extends State<MeditationHomeScreen>
             ),
     );
 
+    final windowSize = WindowSize.of(context);
+
     return Theme(
       data: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
       child: Scaffold(
+        // On a wide screen the bar is a fixed header above two panes rather
+        // than a sliver that floats over one scrolling column.
+        appBar: windowSize.canSplit
+            ? AppBar(
+                leading: _buildHelpButton(context),
+                title: _buildAppBarTitle(context),
+                actions: _buildAppBarActions(context),
+              )
+            : null,
         body: SafeArea(
           child: FadeTransition(
             opacity: _fadeAnimation,
-            child: CustomScrollView(
-              slivers: [
-                SliverAppBar(
-                  floating: true,
-                  leading: IconButton(
-                    icon: const Icon(Icons.info_outline_rounded),
-                    onPressed: () =>
-                        _navigateTo(context, const AlarmHelpScreen()),
-                    tooltip: t.translate('alarmHelp.title'),
-                  ),
-                  // The full product name is wider than the former short
-                  // mark. Scale it down on narrow phones so it never crowds
-                  // the leading and action buttons in the app bar.
-                  title: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          t.translate('app.splash.subtitle'),
-                          style: const TextStyle(fontWeight: FontWeight.w300),
-                        ),
-                        Text(
-                          t.translate('app.splash.timer'),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.bar_chart_rounded),
-                      onPressed: () =>
-                          _navigateTo(context, const StatsScreen()),
-                      tooltip: t.translate('home.statistics'),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.settings_rounded),
-                      onPressed: () =>
-                          _navigateTo(context, const SettingsScreen()),
-                      tooltip: t.translate('home.settings'),
-                    ),
-                  ],
-                ),
+            child: windowSize.canSplit
+                ? _buildSplitBody(context)
+                : _buildSingleColumnBody(context),
+          ),
+        ),
+      ),
+    );
+  }
 
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 12, bottom: 4),
-                    child: Column(
-                      children: [
-                        _buildModeSelector(context),
-                        const SizedBox(height: 24),
-                        if (_selectedMode == TimerMode.timed)
-                          _buildDurationPicker(context)
-                        else if (_selectedMode == TimerMode.endAt)
-                          _buildEndAtPicker(context)
-                        else
-                          _buildUnlimitedInfo(context),
-                        const SizedBox(height: 24),
-                        _buildStartButton(context),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+  // ── Layout ────────────────────────────────────────────────────────────────
+
+  IconButton _buildHelpButton(BuildContext context) {
+    final t = TranslationService.of(context);
+    return IconButton(
+      icon: const Icon(Icons.info_outline_rounded),
+      onPressed: () => _navigateTo(context, const AlarmHelpScreen()),
+      tooltip: t.translate('alarmHelp.title'),
+    );
+  }
+
+  // The full product name is wider than the former short mark. Scale it down on
+  // narrow phones so it never crowds the leading and action buttons.
+  Widget _buildAppBarTitle(BuildContext context) {
+    final t = TranslationService.of(context);
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            t.translate('app.splash.subtitle'),
+            style: const TextStyle(fontWeight: FontWeight.w300),
+          ),
+          Text(
+            t.translate('app.splash.timer'),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildAppBarActions(BuildContext context) {
+    final t = TranslationService.of(context);
+    return [
+      IconButton(
+        icon: const Icon(Icons.bar_chart_rounded),
+        onPressed: () => _navigateTo(context, const StatsScreen()),
+        tooltip: t.translate('home.statistics'),
+      ),
+      IconButton(
+        icon: const Icon(Icons.settings_rounded),
+        onPressed: () => _navigateTo(context, const SettingsScreen()),
+        tooltip: t.translate('home.settings'),
+      ),
+    ];
+  }
+
+  /// The picker that belongs to the selected mode.
+  Widget _buildModePicker(BuildContext context) {
+    if (_selectedMode == TimerMode.timed) return _buildDurationPicker(context);
+    if (_selectedMode == TimerMode.endAt) return _buildEndAtPicker(context);
+    return _buildUnlimitedInfo(context);
+  }
+
+  /// Phones, and an iPad sharing the screen: one scrolling column.
+  Widget _buildSingleColumnBody(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          floating: true,
+          leading: _buildHelpButton(context),
+          title: _buildAppBarTitle(context),
+          actions: _buildAppBarActions(context),
+        ),
+
+        SliverToBoxAdapter(
+          child: ContentColumn(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 4),
+              child: Column(
+                children: [
+                  _buildModeSelector(context),
+                  const SizedBox(height: 24),
+                  _buildModePicker(context),
+                  const SizedBox(height: 24),
+                  _buildStartButton(context),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// iPads: the mode selector and its picker keep the leading pane, and the
+  /// Start dial gets one of its own.
+  ///
+  /// Stacked, those three fill well over an iPad's height, so Start ends up
+  /// below the fold on the one screen that has room to spare. Side by side both
+  /// halves are reachable without scrolling, and neither control is stretched
+  /// across the full width.
+  Widget _buildSplitBody(BuildContext context) {
+    return TwoPaneLayout(
+      startFlex: 3,
+      endFlex: 2,
+      startMaxWidth: 560,
+      start: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          children: [
+            _buildModeSelector(context),
+            const SizedBox(height: 24),
+            _buildModePicker(context),
+          ],
+        ),
+      ),
+      // Centred in the pane, but still scrollable: a 200pt dial plus padding
+      // does not fit the short side of a landscape phone-sized Stage Manager
+      // window, and an overflow there would clip it rather than scroll.
+      end: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: (constraints.maxHeight - 48).clamp(0.0, 2000.0),
+            ),
+            child: Center(child: _buildStartButton(context)),
           ),
         ),
       ),

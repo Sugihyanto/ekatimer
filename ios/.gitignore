@@ -19,6 +19,9 @@ Flutter/App.framework
 Flutter/Flutter.framework
 Flutter/Flutter.podspec
 Flutter/Generated.xcconfig
+# Local Apple identity (bundle ID, app group, team). Flutter/Identity.xcconfig
+# ships upstream's defaults; this file overrides them per machine and per CI run.
+Flutter/Identity.local.xcconfig
 Flutter/ephemeral/
 Flutter/app.flx
 Flutter/app.zip

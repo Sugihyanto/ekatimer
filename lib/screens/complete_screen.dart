@@ -11,6 +11,7 @@ import '../models/meditation_session.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/services.dart';
+import '../widgets/adaptive_layout.dart';
 import '../widgets/edit_session_dialog.dart';
 import '../widgets/sitting_quality_input.dart';
 import '../utils/sitting_quality.dart';
@@ -272,136 +273,141 @@ class _CompleteScreenState extends State<CompleteScreen>
           backgroundColor: theme.colorScheme.surface,
           body: SafeArea(
             child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(32, 8, 32, 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ScaleTransition(
-                      scale: _scaleAnimation,
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.success.withAlpha(30),
-                          border: Border.all(
+              // Capped on a tablet: the summary is a short column of labels,
+              // and stretched over an iPad's width its rows drift so far apart
+              // that a duration stops reading as belonging to its own label.
+              child: ContentColumn(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(32, 8, 32, 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ScaleTransition(
+                        scale: _scaleAnimation,
+                        child: Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.success.withAlpha(30),
+                            border: Border.all(
+                              color: AppColors.success,
+                              width: 3,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.check_rounded,
+                            size: 60,
                             color: AppColors.success,
-                            width: 3,
                           ),
                         ),
-                        child: const Icon(
-                          Icons.check_rounded,
-                          size: 60,
-                          color: AppColors.success,
+                      ),
+                      const SizedBox(height: 32),
+
+                      FadeTransition(
+                        opacity: _opacityAnimation,
+                        child: Column(
+                          children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _qualitySaving || _exitInProgress
+                                    ? null
+                                    : _onBackToHome,
+                                child: Text(t.translate('complete.backToHome')),
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 20,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white.withAlpha(15)
+                                    : Colors.black.withAlpha(8),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    t.translate('complete.meditationTime'),
+                                    style: Theme.of(context).textTheme.bodyLarge
+                                        ?.copyWith(
+                                          color: AppColors.textSecondaryLight,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    TimeUtils.formatDuration(
+                                      _displayedDurationSeconds,
+                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w300,
+                                          fontSize: 48,
+                                          letterSpacing: 4,
+                                          color: AppColors.primary,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    TimeUtils.formatDurationReadable(
+                                      _displayedDurationSeconds,
+                                    ),
+                                    style: Theme.of(context).textTheme.bodyLarge
+                                        ?.copyWith(
+                                          color: AppColors.textSecondaryLight,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            Text(
+                              widget.isTimedOut
+                                  ? t.translate('complete.sessionComplete')
+                                  : t.translate('complete.sessionEnded'),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w300,
+                                    letterSpacing: 1,
+                                    color: AppColors.textSecondaryLight,
+                                  ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            _buildQualityEditor(context, t),
+
+                            const SizedBox(height: 16),
+
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _qualitySaving || _exitInProgress
+                                    ? null
+                                    : () => _onEditSession(context),
+                                icon: const Icon(Icons.edit_outlined, size: 18),
+                                label: Text(t.translate('editSession.title')),
+                              ),
+                            ),
+
+                            ..._buildReflection(context),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    FadeTransition(
-                      opacity: _opacityAnimation,
-                      child: Column(
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _qualitySaving || _exitInProgress
-                                  ? null
-                                  : _onBackToHome,
-                              child: Text(t.translate('complete.backToHome')),
-                            ),
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 20,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? Colors.white.withAlpha(15)
-                                  : Colors.black.withAlpha(8),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  t.translate('complete.meditationTime'),
-                                  style: Theme.of(context).textTheme.bodyLarge
-                                      ?.copyWith(
-                                        color: AppColors.textSecondaryLight,
-                                      ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  TimeUtils.formatDuration(
-                                    _displayedDurationSeconds,
-                                  ),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w300,
-                                        fontSize: 48,
-                                        letterSpacing: 4,
-                                        color: AppColors.primary,
-                                      ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  TimeUtils.formatDurationReadable(
-                                    _displayedDurationSeconds,
-                                  ),
-                                  style: Theme.of(context).textTheme.bodyLarge
-                                      ?.copyWith(
-                                        color: AppColors.textSecondaryLight,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          Text(
-                            widget.isTimedOut
-                                ? t.translate('complete.sessionComplete')
-                                : t.translate('complete.sessionEnded'),
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w300,
-                                  letterSpacing: 1,
-                                  color: AppColors.textSecondaryLight,
-                                ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          _buildQualityEditor(context, t),
-
-                          const SizedBox(height: 16),
-
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _qualitySaving || _exitInProgress
-                                  ? null
-                                  : () => _onEditSession(context),
-                              icon: const Icon(Icons.edit_outlined, size: 18),
-                              label: Text(t.translate('editSession.title')),
-                            ),
-                          ),
-
-                          ..._buildReflection(context),
-                        ],
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

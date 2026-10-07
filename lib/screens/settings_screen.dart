@@ -18,9 +18,27 @@ import '../services/backup_service.dart';
 import '../services/database_service.dart';
 import '../theme/colors.dart';
 import '../theme/app_theme.dart';
+import '../widgets/adaptive_layout.dart';
 import '../widgets/sound_picker.dart';
 import '../widgets/vibration_picker.dart';
 import '../utils/constants.dart';
+import '../utils/responsive.dart';
+
+/// One block of the settings list: a heading, and the rows beneath it.
+class _SettingsSection {
+  const _SettingsSection({
+    required this.icon,
+    required this.title,
+    required this.children,
+  });
+
+  /// Shown in the iPad sidebar. The phone layout has no room for it and uses
+  /// the heading alone.
+  final IconData icon;
+
+  final String title;
+  final List<Widget> children;
+}
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -30,6 +48,10 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  /// Which section the detail pane shows. Only read by the split layout; a
+  /// phone shows every section at once, so it has nothing to select.
+  int _selectedSection = 0;
+
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
@@ -46,509 +68,599 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ? settings.locale
         : 'en';
 
+    final sections = _buildSections(
+      context,
+      settings: settings,
+      t: t,
+      languages: languages,
+      selectedLocale: selectedLocale,
+      isDark: isDark,
+    );
+
     return Theme(
       data: theme,
       child: Scaffold(
         appBar: AppBar(title: Text(t.translate('settings.title'))),
-        body: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          children: [
-            _buildSectionHeader(context, t.translate('settings.profile')),
-            _buildListTile(
-              context,
-              icon: Icons.switch_account_outlined,
-              title: t.translate('profiles.active'),
-              subtitle: settings.userName,
-              trailing: const Icon(Icons.manage_accounts_outlined),
-              onTap: () => _showProfilesDialog(context, settings),
-            ),
-            _buildListTile(
-              context,
-              icon: Icons.language,
-              title: t.translate('settings.language'),
-              trailing: DropdownButton<String>(
-                isExpanded: true,
-                itemHeight: null,
-                value: selectedLocale,
-                underline: const SizedBox(),
-                items: languages.keys.map((code) {
-                  return DropdownMenuItem(
-                    value: code,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      child: Text(languages[code] ?? code),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) settings.setLocale(value);
-                },
-              ),
-            ),
+        body: WindowSize.of(context).canSplit
+            ? _buildSplitSettings(context, sections)
+            : _buildStackedSettings(context, sections),
+      ),
+    );
+  }
 
-            const Divider(),
-
-            _buildSectionHeader(
-              context,
-              t.translate('settings.timerModeSettings'),
-            ),
-            _buildListTile(
-              context,
-              icon: Icons.timer_outlined,
-              title: t.translate('settings.defaultTimerMode'),
-              trailing: DropdownButton<TimerMode>(
-                isExpanded: true,
-                itemHeight: null,
-                value: settings.defaultTimerMode,
-                underline: const SizedBox(),
-                items: TimerMode.values.map((mode) {
-                  return DropdownMenuItem(
-                    value: mode,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      child: Text(_modeLabel(t, mode)),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) settings.setTimerMode(value);
-                },
-              ),
-            ),
-
-            const Divider(),
-
-            _buildSectionHeader(
-              context,
-              t.translate('settings.delayBeforeStart'),
-            ),
-            _buildListTile(
-              context,
-              icon: Icons.timer_off_outlined,
-              title: t.translate('settings.delaySeconds'),
-              subtitle: settings.sessionDelaySeconds > 0
-                  ? t.translate(
-                      'settings.delayCount',
-                      args: {'seconds': '${settings.sessionDelaySeconds}'},
-                    )
-                  : t.translate('settings.disabled'),
-              trailing: SizedBox(
-                width: 160,
-                child: Slider(
-                  value: settings.sessionDelaySeconds.toDouble(),
-                  min: 0,
-                  max: 60,
-                  divisions: 12,
-                  label: settings.sessionDelaySeconds > 0
-                      ? '${settings.sessionDelaySeconds}s'
-                      : 'Off',
-                  onChanged: (value) => settings.setSessionDelay(value.round()),
-                ),
-              ),
-            ),
-
-            const Divider(),
-
-            _buildSectionHeader(
-              context,
-              t.translate('settings.soundVibrationSettings'),
-            ),
-            _buildListTile(
-              context,
-              icon: Icons.volume_up_outlined,
-              title: t.translate('settings.sessionVolume'),
-              trailing: SizedBox(
-                width: 120,
-                child: Slider(
-                  value: settings.soundConfig.volume.toDouble(),
-                  min: 0,
-                  max: 100,
-                  divisions: 10,
-                  label: '${settings.soundConfig.volume}%',
-                  onChanged: (value) => settings.setVolume(value.round()),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: SoundPicker(
-                label: t.translate('settings.startSound'),
-                currentSound: settings.soundConfig.startSound,
-                onChanged: (sound) => settings.setStartSound(sound),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: VibrationPicker(
-                label: t.translate('settings.startVibration'),
-                currentVibration: settings.vibrationConfig.startVibration,
-                onChanged: (vib) => settings.setStartVibration(vib),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: SoundPicker(
-                label: t.translate('settings.endSound'),
-                currentSound: settings.soundConfig.endSound,
-                onChanged: (sound) => settings.setEndSound(sound),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: VibrationPicker(
-                label: t.translate('settings.endVibration'),
-                currentVibration: settings.vibrationConfig.endVibration,
-                onChanged: (vib) => settings.setEndVibration(vib),
-              ),
-            ),
-
-            const Divider(),
-
-            _buildSectionHeader(
-              context,
-              t.translate('settings.intervalBellVibration'),
-            ),
-            _buildIntervalTile(
-              context,
-              icon: Icons.repeat_one_outlined,
-              title: t.translate('settings.intervalSound'),
-              subtitle: settings.soundConfig.intervalMinutes > 0
-                  ? t.translate(
-                      'settings.everyMin',
-                      args: {
-                        'minutes': '${settings.soundConfig.intervalMinutes}',
-                      },
-                    )
-                  : t.translate('settings.disabled'),
-              value: settings.soundConfig.intervalMinutes,
-              soundValue: settings.soundConfig.intervalSound,
-              onMinutesChanged: (m) => settings.setIntervalMinutes(m),
-              onSoundChanged: (s) => settings.setIntervalSound(s),
-            ),
-            _buildIntervalVibrationTile(context, settings: settings),
-            const Divider(),
-
-            const Divider(),
-
-            _buildSectionHeader(context, t.translate('settings.display')),
-            _buildListTile(
-              context,
-              icon: Icons.phone_android_outlined,
-              title: t.translate('settings.screenDuring'),
-              subtitle: _getScreenControlLabel(t, settings.screenControl),
-              trailing: DropdownButton<String>(
-                isExpanded: true,
-                itemHeight: null,
-                value: settings.screenControl,
-                underline: const SizedBox(),
-                items: ['deviceTimeOut', 'dim', 'on'].map((control) {
-                  return DropdownMenuItem(
-                    value: control,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      child: Text(_getScreenControlLabel(t, control)),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) settings.setScreenControl(value);
-                },
-              ),
-            ),
-            _buildListTile(
-              context,
-              icon: Icons.dark_mode_outlined,
-              title: t.translate('settings.theme'),
-              subtitle: _getThemeModeLabel(t, settings.themeMode),
-              trailing: DropdownButton<String>(
-                isExpanded: true,
-                itemHeight: null,
-                value: settings.themeMode,
-                underline: const SizedBox(),
-                items: ['deviceTheme', 'light', 'dark'].map((mode) {
-                  return DropdownMenuItem(
-                    value: mode,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      child: Text(_getThemeModeLabel(t, mode)),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) settings.setThemeMode(value);
-                },
-              ),
-            ),
-            // Transparent Widget toggle – Android only
-            if (!Platform.isIOS)
-              SwitchListTile(
-                secondary: const Icon(Icons.widgets_outlined),
-                title: Text(t.translate('settings.transparentWidget')),
-                // subtitle: Text(
-                //   t.translate('settings.transparentWidgetDesc'),
-                //   style: const TextStyle(fontSize: 13),
-                // ),
-                value: settings.transparentWidget,
-                onChanged: (value) => settings.setTransparentWidget(value),
-              ),
-
-            const Divider(),
-
-            _buildSectionHeader(
-              context,
-              t.translate('settings.dataManagement'),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isDark
-                        ? Colors.white.withAlpha(25)
-                        : Colors.black.withAlpha(12),
+  /// Every settings section, in order, for both layouts to render.
+  ///
+  /// Built in one place so a row cannot be added to the phone list and
+  /// quietly go missing from the iPad one.
+  List<_SettingsSection> _buildSections(
+    BuildContext context, {
+    required SettingsProvider settings,
+    required TranslationService t,
+    required Map<String, String> languages,
+    required String selectedLocale,
+    required bool isDark,
+  }) {
+    return [
+      _SettingsSection(
+        icon: Icons.person_outline,
+        title: t.translate('settings.profile'),
+        children: [
+          _buildListTile(
+            context,
+            icon: Icons.switch_account_outlined,
+            title: t.translate('profiles.active'),
+            subtitle: settings.userName,
+            trailing: const Icon(Icons.manage_accounts_outlined),
+            onTap: () => _showProfilesDialog(context, settings),
+          ),
+          _buildListTile(
+            context,
+            icon: Icons.language,
+            title: t.translate('settings.language'),
+            trailing: DropdownButton<String>(
+              isExpanded: true,
+              itemHeight: null,
+              value: selectedLocale,
+              underline: const SizedBox(),
+              items: languages.keys.map((code) {
+                return DropdownMenuItem(
+                  value: code,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12.0),
+                    child: Text(languages[code] ?? code),
                   ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 20,
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) settings.setLocale(value);
+              },
+            ),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        icon: Icons.timer_outlined,
+        title: t.translate('settings.timerModeSettings'),
+        children: [
+          _buildListTile(
+            context,
+            icon: Icons.timer_outlined,
+            title: t.translate('settings.defaultTimerMode'),
+            trailing: DropdownButton<TimerMode>(
+              isExpanded: true,
+              itemHeight: null,
+              value: settings.defaultTimerMode,
+              underline: const SizedBox(),
+              items: TimerMode.values.map((mode) {
+                return DropdownMenuItem(
+                  value: mode,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12.0),
+                    child: Text(_modeLabel(t, mode)),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildDataButton(
-                          context,
-                          icon: Icons.file_download_outlined,
-                          label: t.translate('settings.importCSV'),
-                          onTap: () => _importCsv(context),
-                          isDark: isDark,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildDataButton(
-                          context,
-                          icon: Icons.file_upload_outlined,
-                          label: t.translate('settings.exportCSV'),
-                          onTap: () => _exportCsv(context),
-                          isDark: isDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) settings.setTimerMode(value);
+              },
+            ),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        icon: Icons.hourglass_empty_rounded,
+        title: t.translate('settings.delayBeforeStart'),
+        children: [
+          _buildListTile(
+            context,
+            icon: Icons.timer_off_outlined,
+            title: t.translate('settings.delaySeconds'),
+            subtitle: settings.sessionDelaySeconds > 0
+                ? t.translate(
+                    'settings.delayCount',
+                    args: {'seconds': '${settings.sessionDelaySeconds}'},
+                  )
+                : t.translate('settings.disabled'),
+            trailing: SizedBox(
+              width: 160,
+              child: Slider(
+                value: settings.sessionDelaySeconds.toDouble(),
+                min: 0,
+                max: 60,
+                divisions: 12,
+                label: settings.sessionDelaySeconds > 0
+                    ? '${settings.sessionDelaySeconds}s'
+                    : 'Off',
+                onChanged: (value) => settings.setSessionDelay(value.round()),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isDark
-                        ? Colors.white.withAlpha(25)
-                        : Colors.black.withAlpha(12),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 20,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildDataButton(
-                          context,
-                          icon: Icons.cloud_upload_outlined,
-                          label: t.translate('backup.save'),
-                          onTap: () => _backupData(context),
-                          isDark: isDark,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildDataButton(
-                          context,
-                          icon: Icons.cloud_download_outlined,
-                          label: t.translate('backup.restore'),
-                          onTap: () => _restoreBackup(context),
-                          isDark: isDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        icon: Icons.volume_up_outlined,
+        title: t.translate('settings.soundVibrationSettings'),
+        children: [
+          _buildListTile(
+            context,
+            icon: Icons.volume_up_outlined,
+            title: t.translate('settings.sessionVolume'),
+            trailing: SizedBox(
+              width: 120,
+              child: Slider(
+                value: settings.soundConfig.volume.toDouble(),
+                min: 0,
+                max: 100,
+                divisions: 10,
+                label: '${settings.soundConfig.volume}%',
+                onChanged: (value) => settings.setVolume(value.round()),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-              child: Text(
-                t.translate('backup.hint'),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? Colors.white.withAlpha(100)
-                      : Colors.black.withAlpha(100),
-                ),
-              ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SoundPicker(
+              label: t.translate('settings.startSound'),
+              currentSound: settings.soundConfig.startSound,
+              onChanged: (sound) => settings.setStartSound(sound),
             ),
-
-            // DIY Convert guide tile
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: isDark
-                        ? Colors.white.withAlpha(25)
-                        : Colors.black.withAlpha(12),
-                  ),
-                ),
-                child: ListTile(
-                  leading: Icon(Icons.info_outline, color: AppColors.primary),
-                  title: Text(
-                    t.translate('settings.diyConvertTitle'),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  subtitle: Text(
-                    t.translate('settings.diyConvertSubtitle'),
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showCsvFormatGuide(context),
-                ),
-              ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: VibrationPicker(
+              label: t.translate('settings.startVibration'),
+              currentVibration: settings.vibrationConfig.startVibration,
+              onChanged: (vib) => settings.setStartVibration(vib),
             ),
-
-            const Divider(),
-
-            _buildSectionHeader(context, t.translate('settings.quotes')),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SoundPicker(
+              label: t.translate('settings.endSound'),
+              currentSound: settings.soundConfig.endSound,
+              onChanged: (sound) => settings.setEndSound(sound),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: VibrationPicker(
+              label: t.translate('settings.endVibration'),
+              currentVibration: settings.vibrationConfig.endVibration,
+              onChanged: (vib) => settings.setEndVibration(vib),
+            ),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        icon: Icons.notifications_active_outlined,
+        title: t.translate('settings.intervalBellVibration'),
+        children: [
+          _buildIntervalTile(
+            context,
+            icon: Icons.repeat_one_outlined,
+            title: t.translate('settings.intervalSound'),
+            subtitle: settings.soundConfig.intervalMinutes > 0
+                ? t.translate(
+                    'settings.everyMin',
+                    args: {
+                      'minutes': '${settings.soundConfig.intervalMinutes}',
+                    },
+                  )
+                : t.translate('settings.disabled'),
+            value: settings.soundConfig.intervalMinutes,
+            soundValue: settings.soundConfig.intervalSound,
+            onMinutesChanged: (m) => settings.setIntervalMinutes(m),
+            onSoundChanged: (s) => settings.setIntervalSound(s),
+          ),
+          _buildIntervalVibrationTile(context, settings: settings),
+        ],
+      ),
+      _SettingsSection(
+        icon: Icons.phone_android_outlined,
+        title: t.translate('settings.display'),
+        children: [
+          _buildListTile(
+            context,
+            icon: Icons.phone_android_outlined,
+            title: t.translate('settings.screenDuring'),
+            subtitle: _getScreenControlLabel(t, settings.screenControl),
+            trailing: DropdownButton<String>(
+              isExpanded: true,
+              itemHeight: null,
+              value: settings.screenControl,
+              underline: const SizedBox(),
+              items: ['deviceTimeOut', 'dim', 'on'].map((control) {
+                return DropdownMenuItem(
+                  value: control,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12.0),
+                    child: Text(_getScreenControlLabel(t, control)),
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) settings.setScreenControl(value);
+              },
+            ),
+          ),
+          _buildListTile(
+            context,
+            icon: Icons.dark_mode_outlined,
+            title: t.translate('settings.theme'),
+            subtitle: _getThemeModeLabel(t, settings.themeMode),
+            trailing: DropdownButton<String>(
+              isExpanded: true,
+              itemHeight: null,
+              value: settings.themeMode,
+              underline: const SizedBox(),
+              items: ['deviceTheme', 'light', 'dark'].map((mode) {
+                return DropdownMenuItem(
+                  value: mode,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12.0),
+                    child: Text(_getThemeModeLabel(t, mode)),
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) settings.setThemeMode(value);
+              },
+            ),
+          ),
+          // Transparent Widget toggle – Android only
+          if (!Platform.isIOS)
             SwitchListTile(
-              secondary: const Icon(Icons.format_quote_rounded),
-              title: Text(t.translate('settings.showQuotes')),
-              subtitle: Text(
-                t.translate('settings.showQuotesDesc'),
-                style: const TextStyle(fontSize: 13),
-              ),
-              value: settings.showQuotes,
-              onChanged: (value) => settings.setShowQuotes(value),
+              secondary: const Icon(Icons.widgets_outlined),
+              title: Text(t.translate('settings.transparentWidget')),
+              // subtitle: Text(
+              //   t.translate('settings.transparentWidgetDesc'),
+              //   style: const TextStyle(fontSize: 13),
+              // ),
+              value: settings.transparentWidget,
+              onChanged: (value) => settings.setTransparentWidget(value),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: isDark
-                        ? Colors.white.withAlpha(25)
-                        : Colors.black.withAlpha(12),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 20,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildDataButton(
-                          context,
-                          icon: Icons.file_download_outlined,
-                          label: t.translate('settings.importQuotes'),
-                          onTap: () => _importQuotes(context),
-                          isDark: isDark,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildDataButton(
-                          context,
-                          icon: Icons.delete_outline,
-                          label: t.translate('settings.clearQuotes'),
-                          onTap: () => _clearQuotes(context),
-                          isDark: isDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              child: Text(
-                t.translate('settings.importQuotesHint'),
-                style: TextStyle(
-                  fontSize: 12,
+        ],
+      ),
+      _SettingsSection(
+        icon: Icons.storage_outlined,
+        title: t.translate('settings.dataManagement'),
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
                   color: isDark
-                      ? Colors.white.withAlpha(100)
-                      : Colors.black.withAlpha(100),
+                      ? Colors.white.withAlpha(25)
+                      : Colors.black.withAlpha(12),
                 ),
               ),
-            ),
-
-            // Create Quotes guide tile
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: isDark
-                        ? Colors.white.withAlpha(25)
-                        : Colors.black.withAlpha(12),
-                  ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 20,
                 ),
-                child: ListTile(
-                  leading: Icon(Icons.info_outline, color: AppColors.primary),
-                  title: Text(
-                    t.translate('settings.createQuotesTitle'),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildDataButton(
+                        context,
+                        icon: Icons.file_download_outlined,
+                        label: t.translate('settings.importCSV'),
+                        onTap: () => _importCsv(context),
+                        isDark: isDark,
+                      ),
                     ),
-                  ),
-                  subtitle: Text(
-                    t.translate('settings.createQuotesSubtitle'),
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showCreateQuotesGuide(context),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildDataButton(
+                        context,
+                        icon: Icons.file_upload_outlined,
+                        label: t.translate('settings.exportCSV'),
+                        onTap: () => _exportCsv(context),
+                        isDark: isDark,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-
-            const Divider(),
-
-            _buildSectionHeader(context, t.translate('settings.about')),
-            _buildListTile(
-              context,
-              icon: Icons.info_outline,
-              title: AppConstants.appName,
-              subtitle: 'Version ${AppConstants.appVersion}',
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: isDark
+                      ? Colors.white.withAlpha(25)
+                      : Colors.black.withAlpha(12),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 20,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildDataButton(
+                        context,
+                        icon: Icons.cloud_upload_outlined,
+                        label: t.translate('backup.save'),
+                        onTap: () => _backupData(context),
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildDataButton(
+                        context,
+                        icon: Icons.cloud_download_outlined,
+                        label: t.translate('backup.restore'),
+                        onTap: () => _restoreBackup(context),
+                        isDark: isDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            _buildListTile(
-              context,
-              icon: Icons.gavel_outlined,
-              title: t.translate('settings.licenseAttribution'),
-              onTap: () => _showLicenseAttributionDialog(context),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+            child: Text(
+              t.translate('backup.hint'),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? Colors.white.withAlpha(100)
+                    : Colors.black.withAlpha(100),
+              ),
             ),
+          ),
 
-            const SizedBox(height: 32),
-          ],
-        ),
+          // DIY Convert guide tile
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: isDark
+                      ? Colors.white.withAlpha(25)
+                      : Colors.black.withAlpha(12),
+                ),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.info_outline, color: AppColors.primary),
+                title: Text(
+                  t.translate('settings.diyConvertTitle'),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                subtitle: Text(
+                  t.translate('settings.diyConvertSubtitle'),
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showCsvFormatGuide(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        icon: Icons.format_quote_rounded,
+        title: t.translate('settings.quotes'),
+        children: [
+          SwitchListTile(
+            secondary: const Icon(Icons.format_quote_rounded),
+            title: Text(t.translate('settings.showQuotes')),
+            subtitle: Text(
+              t.translate('settings.showQuotesDesc'),
+              style: const TextStyle(fontSize: 13),
+            ),
+            value: settings.showQuotes,
+            onChanged: (value) => settings.setShowQuotes(value),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: isDark
+                      ? Colors.white.withAlpha(25)
+                      : Colors.black.withAlpha(12),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 20,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildDataButton(
+                        context,
+                        icon: Icons.file_download_outlined,
+                        label: t.translate('settings.importQuotes'),
+                        onTap: () => _importQuotes(context),
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildDataButton(
+                        context,
+                        icon: Icons.delete_outline,
+                        label: t.translate('settings.clearQuotes'),
+                        onTap: () => _clearQuotes(context),
+                        isDark: isDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            child: Text(
+              t.translate('settings.importQuotesHint'),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? Colors.white.withAlpha(100)
+                    : Colors.black.withAlpha(100),
+              ),
+            ),
+          ),
+
+          // Create Quotes guide tile
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: isDark
+                      ? Colors.white.withAlpha(25)
+                      : Colors.black.withAlpha(12),
+                ),
+              ),
+              child: ListTile(
+                leading: Icon(Icons.info_outline, color: AppColors.primary),
+                title: Text(
+                  t.translate('settings.createQuotesTitle'),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                subtitle: Text(
+                  t.translate('settings.createQuotesSubtitle'),
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showCreateQuotesGuide(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        icon: Icons.info_outline,
+        title: t.translate('settings.about'),
+        children: [
+          _buildListTile(
+            context,
+            icon: Icons.info_outline,
+            title: AppConstants.appName,
+            subtitle: 'Version ${AppConstants.appVersion}',
+          ),
+          _buildListTile(
+            context,
+            icon: Icons.gavel_outlined,
+            title: t.translate('settings.licenseAttribution'),
+            onTap: () => _showLicenseAttributionDialog(context),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  /// Phones: one scrolling list, every section under the last.
+  Widget _buildStackedSettings(
+    BuildContext context,
+    List<_SettingsSection> sections,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        for (final (index, section) in sections.indexed) ...[
+          if (index > 0) const Divider(),
+          _buildSectionHeader(context, section.title),
+          ...section.children,
+        ],
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  /// iPads: section titles in a sidebar, the chosen section beside it.
+  ///
+  /// Stacked, these nine sections are several screens of scrolling even on
+  /// an iPad, and every row is stretched the full width of the display. A
+  /// sidebar makes any section one tap away and keeps the rows readable.
+  Widget _buildSplitSettings(
+    BuildContext context,
+    List<_SettingsSection> sections,
+  ) {
+    // Clamped rather than asserted: the section list is rebuilt on every
+    // frame, and a future edit that removes one should not throw.
+    final selected = _selectedSection.clamp(0, sections.length - 1);
+    final section = sections[selected];
+
+    return TwoPaneLayout(
+      startFlex: 2,
+      endFlex: 5,
+      startMaxWidth: 300,
+      start: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: sections.length,
+        itemBuilder: (context, index) {
+          final item = sections[index];
+          return ListTile(
+            leading: Icon(item.icon),
+            title: Text(item.title),
+            selected: index == selected,
+            selectedTileColor: AppColors.primary.withValues(alpha: 0.08),
+            onTap: () => setState(() => _selectedSection = index),
+          );
+        },
+      ),
+      // Keyed on the selection so switching sections starts the detail
+      // pane back at the top instead of keeping the old scroll offset.
+      end: ListView(
+        key: ValueKey<int>(selected),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        children: [
+          _buildSectionHeader(context, section.title),
+          ...section.children,
+          const SizedBox(height: 32),
+        ],
       ),
     );
   }

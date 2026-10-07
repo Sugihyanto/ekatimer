@@ -1,0 +1,38 @@
+// Project-wide build variables, applied as the base configuration of the
+// Xcode *project* so every target sees them — the app, the widget extension
+// and the tests. Target-level xcconfigs (Debug/Release.xcconfig) and explicit
+// target build settings still win over anything defined here.
+//
+// Flutter regenerates Generated.xcconfig on every `flutter build`/`flutter run`
+// and it is not in version control. Including it here is what makes
+// FLUTTER_BUILD_NAME/FLUTTER_BUILD_NUMBER readable from the widget extension,
+// so the extension can never ship a version that disagrees with the app — App
+// Store Connect rejects that. The include is optional so that opening the
+// project in Xcode before any Flutter command still parses.
+#include? "Generated.xcconfig"
+
+// ── Apple identity ────────────────────────────────────────────────────────────
+//
+// These are upstream ekaTimer's values, so a clean clone of this repository
+// builds with upstream's identity and carries nobody's private signing setup.
+//
+// To build under your own identity, write Flutter/Identity.local.xcconfig next
+// to this file and redefine any of the three. That file is not tracked (see
+// ios/.gitignore); it is included last, so its values win:
+//
+//     APP_BUNDLE_ID = com.example.myapp
+//     APP_GROUP_ID = group.com.example.myapp.shared
+//     APP_DEVELOPMENT_TEAM = ABCDE12345
+//
+// APP_GROUP_ID is the container the app and the home-screen widget share, and
+// APP_DEVELOPMENT_TEAM feeds DEVELOPMENT_TEAM for automatic signing. Both the
+// bundle ID and the app group have to exist in the Apple Developer account that
+// owns the team, so change all three together.
+//
+// CI writes Identity.local.xcconfig from a secret before building; see
+// .github/workflows/ios-release.yml.
+APP_BUNDLE_ID = org.ekatimer.ios.gmlpub
+APP_GROUP_ID = group.org.ekatimer.ios.gmlpub.shared
+APP_DEVELOPMENT_TEAM = UZ9CGUQ4RH
+
+#include? "Identity.local.xcconfig"
